@@ -8,25 +8,28 @@ import { CustomizationPage } from "./components/customization-page";
 import { AIPanelPage } from "./components/ai-panel-page";
 import { AppLayout } from "./components/app-layout";
 import { AIEngineProvider } from "./components/ai-engine-context";
+import { CustomizationProvider } from "./components/customization-context";
 
 export default function App() {
   return (
     <div className="size-full dark">
       <BrowserRouter>
-        <AIEngineProvider>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/focus" element={<FocusSessionPage />} />
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/tasks" element={<TaskPlannerPage />} />
-              <Route path="/ai" element={<AIPanelPage />} />
-              <Route path="/progress" element={<ProgressPage />} />
-              <Route path="/customize" element={<CustomizationPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AIEngineProvider>
+        <CustomizationProvider>
+          <AIEngineProvider>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/focus" element={<FocusSessionPage />} />
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/tasks" element={<TaskPlannerPage />} />
+                <Route path="/ai" element={<AIPanelPage />} />
+                <Route path="/progress" element={<ProgressPage />} />
+                <Route path="/customize" element={<CustomizationPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AIEngineProvider>
+        </CustomizationProvider>
       </BrowserRouter>
     </div>
   );

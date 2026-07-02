@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { useState } from "react";
 import { useAIEngine, canvasCourses } from "./ai-engine-context";
+import { useCustomization } from "./customization-context";
 
 const focusData = [
   { day: "Mon", hours: 3.5 },
@@ -58,6 +59,7 @@ function WorkloadHeatmap({ days }: { days: ReturnType<typeof useAIEngine>["workl
 }
 
 export function DashboardPage() {
+  const { savedMode } = useCustomization();
   const navigate = useNavigate();
   const { insights, workloadByDay, adaptedPomoDuration, integrations, isAnalyzing, triggerRescan, dismissInsight } = useAIEngine();
   const currentHour = new Date().getHours();
@@ -85,13 +87,21 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
+    <div className={`min-h-screen bg-background text-foreground p-6 transition-all duration-500 ${
+      savedMode === "competitive" ? "font-semibold tracking-tight" :
+      savedMode === "cozy"        ? "font-light" :
+                                    "font-medium"
+    }`}>
       <div className="max-w-7xl mx-auto space-y-6">
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-1">{greeting}, Alex</h1>
-            <p className="text-muted-foreground">You have 3 deadlines this week · AI is managing your schedule</p>
+            <p className="text-muted-foreground">
+              {savedMode === "cozy"        ? "Ready when you are 🌿 You have 3 deadlines this week." :
+              savedMode === "competitive" ? "Let's crush it today ⚡ 3 deadlines to destroy this week." :
+                                            "Your study group is active 👥 3 deadlines on deck this week."}
+            </p>
           </div>
           <button
             onClick={triggerRescan}

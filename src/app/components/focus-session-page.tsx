@@ -3,6 +3,7 @@ import { Play, Pause, SkipForward, Settings, Volume2, X, ChevronLeft, Brain, Spa
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useAIEngine, productivityPatterns } from "./ai-engine-context";
+import { useCustomization } from "./customization-context";
 
 const environments = [
   { id: "cafe", name: "Rainy Café", image: "https://images.unsplash.com/photo-1739918069081-78dddf3240a6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920" },
@@ -25,6 +26,7 @@ interface SessionEntry {
 }
 
 export function FocusSessionPage() {
+  const { savedMode, settings } = useCustomization();
   const navigate = useNavigate();
   const { burnoutRisk, adaptedPomoDuration, insights } = useAIEngine();
 
@@ -34,7 +36,9 @@ export function FocusSessionPage() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(adaptedPomoDuration * 60);
-  const [selectedEnv, setSelectedEnv] = useState(environments[0]);
+  // Read the saved environment from customization settings and match it to our environments array
+  const savedEnv = environments.find(e => e.id === settings.environmentId) ?? environments[0];
+  const [selectedEnv, setSelectedEnv] = useState(savedEnv);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedTask, setSelectedTask] = useState(currentTasks[0]);
   const [mode, setMode] = useState<"focus" | "break">("focus");
@@ -95,7 +99,11 @@ export function FocusSessionPage() {
   const aiCheckIn = insights.find(i => !i.dismissed && i.type === "burnout");
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className={`relative min-h-screen overflow-hidden transition-all duration-500 ${
+      savedMode === "competitive" ? "font-semibold" :
+      savedMode === "cozy"        ? "font-light" :
+                                    "font-medium"
+    }`}>
       {/* Background */}
       <motion.div key={selectedEnv.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0">
         <img src={selectedEnv.image} alt={selectedEnv.name} className="size-full object-cover" />

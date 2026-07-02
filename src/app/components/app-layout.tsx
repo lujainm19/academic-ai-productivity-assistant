@@ -3,6 +3,7 @@ import { LayoutDashboard, Target, Zap, Trophy, Settings, Brain } from "lucide-re
 import { motion } from "motion/react";
 import { useAIEngine } from "./ai-engine-context";
 import { AINotificationOverlay } from "./ai-notification-overlay";
+import { useCustomization } from "./customization-context";
 
 const navItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -18,13 +19,18 @@ export function AppLayout() {
   const location = useLocation();
   const { insights, isAnalyzing } = useAIEngine();
   const urgentCount = insights.filter(i => !i.dismissed && (i.priority === "urgent" || i.priority === "high")).length;
+  const { savedMode } = useCustomization();
 
   return (
-    <div className="flex h-screen bg-background dark">
+    <div className={`flex h-screen bg-background dark mode-${savedMode}`}>
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="w-20 lg:w-64 border-r border-border flex flex-col bg-card/30 backdrop-blur-sm"
+        className={`w-20 lg:w-64 border-r border-border flex flex-col backdrop-blur-sm transition-all duration-500 ${
+          savedMode === "cozy"          ? "bg-card/30" :
+          savedMode === "competitive"   ? "bg-card/60 border-orange-500/20" :
+                                          "bg-card/40 border-indigo-500/20"
+        }`}
       >
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-3">
@@ -43,7 +49,10 @@ export function AppLayout() {
           <div className="flex items-center gap-2">
             <div className={`size-2 rounded-full ${isAnalyzing ? "bg-amber-500 animate-pulse" : "bg-green-500"}`} />
             <span className="text-xs text-muted-foreground">
-              {isAnalyzing ? "AI analyzing..." : "AI active · monitoring"}
+              {isAnalyzing ? "AI analyzing..." :
+                savedMode === "cozy"        ? "AI active · here when you need it 🌿" :
+                savedMode === "competitive" ? "AI active · pushing you forward ⚡" :
+                                              "AI active · synced with your team 👥"}
             </span>
           </div>
         </div>

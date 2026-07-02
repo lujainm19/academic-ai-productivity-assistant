@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Plus, Calendar, Clock, Zap, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Link2 } from "lucide-react";
 import { useState } from "react";
 import { useAIEngine, canvasCourses } from "./ai-engine-context";
+import { useCustomization } from "./customization-context";
 
 const allTasks = [
   { id: 1, title: "COSC125 Assignment 3", due: "2026-05-29", priority: "high" as const, energy: "Deep Work", duration: "2h", course: "COSC125", courseColor: "#6366f1", status: "todo", weight: 15, difficulty: 3, aiTimeSlot: "Tonight 7–9 PM", conflictFree: true },
@@ -21,6 +22,7 @@ const urgencyScore = (task: typeof allTasks[0]) => {
 };
 
 export function TaskPlannerPage() {
+  const { savedMode } = useCustomization();
   const { insights, isAnalyzing } = useAIEngine();
   const [tasks, setTasks] = useState(allTasks);
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
@@ -67,7 +69,11 @@ export function TaskPlannerPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">Task Planner</h1>
-            <p className="text-muted-foreground">AI-prioritized assignments from Canvas LMS</p>
+            <p className="text-muted-foreground">
+              {savedMode === "cozy"        ? "Take it one task at a time 🌿 No rush, just progress." :
+              savedMode === "competitive" ? "Ranked by urgency ⚡ Attack the hardest tasks first." :
+                                             "Synced with your team 👥 Stay on track together."}
+            </p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
