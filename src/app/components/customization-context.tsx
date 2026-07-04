@@ -98,6 +98,7 @@ export const THEME_VARS: Record<ThemeId, { primary: string; accent: string }> = 
 interface CustomizationContextValue {
   settings: CustomizationSettings;       // the current draft (unsaved changes included)
   savedMode: StudyMode;                  // the last saved mode (used by other pages)
+  savedSettings: CustomizationSettings;
   setStudyMode: (mode: StudyMode) => void;
   setTheme: (id: ThemeId) => void;
   setEnvironment: (id: EnvironmentId) => void;
@@ -126,6 +127,44 @@ function applyTheme(themeId: ThemeId) {
   document.documentElement.style.setProperty("--primary", vars.primary);
   document.documentElement.style.setProperty("--accent", vars.accent);
   document.documentElement.style.setProperty("--ring", vars.primary);
+
+  // Inject style tag to override Tailwind's color classes
+  const existing = document.getElementById("theme-style-override");
+  if (existing) existing.remove();
+  const styleTag = document.createElement("style");
+  styleTag.id = "theme-style-override";
+  styleTag.innerHTML = `
+    /* Primary colored backgrounds — keep text white */
+    .bg-primary { 
+      background-color: ${vars.primary} !important; 
+      color: #ffffff !important;
+    }
+    .bg-primary * { color: #ffffff !important; }
+
+    /* Text that should use primary color */
+    .text-primary { color: ${vars.primary} !important; }
+    .text-accent { color: ${vars.accent} !important; }
+
+    /* Borders */
+    .border-primary\\/50, .border-primary\\/30, .border-primary\\/20 { 
+      border-color: ${vars.primary}50 !important; 
+    }
+
+    /* Gradient progress bars and XP bars only — not nav buttons */
+    .h-full.bg-gradient-to-r { 
+      background-image: linear-gradient(to right, ${vars.primary}, ${vars.accent}) !important; 
+    }
+    
+    /* Primary/accent icon colors */
+    .text-primary svg, svg.text-primary { color: ${vars.primary} !important; }
+
+    /* Ring color */
+    .ring-primary { --tw-ring-color: ${vars.primary} !important; }
+
+    /* Accent color */
+    .accent-primary { accent-color: ${vars.primary} !important; }
+  `;
+  document.head.appendChild(styleTag);
 }
 
 // ── Helper: Apply Mode to DOM ──────────────────────────────────────────────
@@ -290,9 +329,12 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
 
   // Live-preview the theme color as the user clicks different themes.
   // Note: mode does NOT live-preview — it only applies on Save.
-  useEffect(() => {
-    applyTheme(draft.themeId);
-  }, [draft.themeId]);
+  
+ // Apply saved theme on first load only
+useEffect(() => {
+  applyTheme(saved.themeId);
+  applyMode(saved.studyMode);
+}, []);
 
   // ── Setters ──────────────────────────────────────────────────────────────
   // Each setter updates only the draft, not the saved state.
@@ -313,10 +355,11 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   // the rest of the app visually transforms.
 
   const saveChanges = () => {
-    setSaved(draft);
-    localStorage.setItem("adaptive:customization", JSON.stringify(draft));
-    applyMode(draft.studyMode); // mode transformation happens here on save
-  };
+  setSaved(draft);
+  localStorage.setItem("adaptive:customization", JSON.stringify(draft));
+  applyMode(draft.studyMode);
+  applyTheme(draft.themeId); // apply theme on save only
+};
 
   // ── Reset to Default ──────────────────────────────────────────────────────
   // Wipes both draft and saved back to DEFAULT_SETTINGS,
@@ -335,6 +378,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     <CustomizationContext.Provider value={{
       settings: draft,
       savedMode: saved.studyMode,
+      savedSettings: saved,
       setStudyMode, setTheme, setEnvironment,
       setAmbientSounds, setBreakReminders,
       setFocusDuration, setBreakDuration, setDefaultEnvironment,

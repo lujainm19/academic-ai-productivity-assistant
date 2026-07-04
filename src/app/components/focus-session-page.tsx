@@ -26,7 +26,7 @@ interface SessionEntry {
 }
 
 export function FocusSessionPage() {
-  const { savedMode, settings } = useCustomization();
+  const { savedMode, savedSettings } = useCustomization();
   const navigate = useNavigate();
   const { burnoutRisk, adaptedPomoDuration, insights } = useAIEngine();
 
@@ -36,8 +36,8 @@ export function FocusSessionPage() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(adaptedPomoDuration * 60);
-  // Read the saved environment from customization settings and match it to our environments array
-  const savedEnv = environments.find(e => e.id === settings.environmentId) ?? environments[0];
+  // Use savedSettings not draft so environment only updates after Save Changes
+  const savedEnv = environments.find(e => e.id === savedSettings.environmentId) ?? environments[0];
   const [selectedEnv, setSelectedEnv] = useState(savedEnv);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedTask, setSelectedTask] = useState(currentTasks[0]);
