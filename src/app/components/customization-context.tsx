@@ -138,6 +138,120 @@ function applyMode(mode: StudyMode) {
   Object.entries(styles).forEach(([key, value]) => {
     document.documentElement.style.setProperty(key, value);
   });
+
+  // Dramatically change background and card colors per mode
+  const modeColors: Record<StudyMode, {
+    bg: string; card: string; border: string; font: string; radius: string;
+  }> = {
+    cozy: {
+      bg: "#13101a",
+      card: "rgba(236,72,153,0.06)",
+      border: "rgba(236,72,153,0.15)",
+      font: "'Inter', sans-serif",
+      radius: "1.5rem",
+    },
+    competitive: {
+      bg: "#0a0a0a",
+      card: "rgba(249,115,22,0.08)",
+      border: "rgba(249,115,22,0.3)",
+      font: "'Space Grotesk', sans-serif",
+      radius: "0.25rem",
+    },
+    collaborative: {
+      bg: "#0d1120",
+      card: "rgba(99,102,241,0.08)",
+      border: "rgba(99,102,241,0.2)",
+      font: "'Plus Jakarta Sans', sans-serif",
+      radius: "1rem",
+    },
+  };
+
+  const c = modeColors[mode];
+  // Set directly on body and root so Tailwind can't override
+  document.body.style.backgroundColor = c.bg;
+  document.body.style.fontFamily = c.font;
+  document.documentElement.style.setProperty("--background", c.bg);
+  document.documentElement.style.setProperty("--card", c.card);
+  document.documentElement.style.setProperty("--border", c.border);
+  document.documentElement.style.setProperty("--radius", c.radius);
+  
+  // Force card colors via a style tag so they override Tailwind
+  const existing = document.getElementById("mode-style-override");
+  if (existing) existing.remove();
+  const styleTag = document.createElement("style");
+  styleTag.id = "mode-style-override";
+  styleTag.innerHTML = `
+    .bg-card, [class*="bg-card"] { background-color: ${c.card} !important; }
+    .border-border, [class*="border-border"] { border-color: ${c.border} !important; }
+    .bg-background { background-color: ${c.bg} !important; }
+    
+    /* Mode: ${mode} — card glow effect */
+    .rounded-xl, .rounded-2xl {
+      box-shadow: ${
+        mode === "competitive"   ? "0 0 20px rgba(249,115,22,0.15), inset 0 1px 0 rgba(249,115,22,0.1)" :
+        mode === "cozy"          ? "0 4px 24px rgba(236,72,153,0.08), inset 0 1px 0 rgba(255,255,255,0.05)" :
+                                   "0 4px 20px rgba(99,102,241,0.1), inset 0 1px 0 rgba(99,102,241,0.08)"
+      } !important;
+    }
+
+    /* Sidebar glow strip */
+    aside {
+      border-right: 1px solid ${c.border} !important;
+      box-shadow: ${
+        mode === "competitive"   ? "4px 0 24px rgba(249,115,22,0.1)" :
+        mode === "cozy"          ? "4px 0 24px rgba(236,72,153,0.06)" :
+                                   "4px 0 24px rgba(99,102,241,0.08)"
+      } !important;
+    }
+
+    /* Button glow on hover */
+    button:hover {
+      box-shadow: ${
+        mode === "competitive"   ? "0 0 12px rgba(249,115,22,0.3)" :
+        mode === "cozy"          ? "0 0 12px rgba(236,72,153,0.2)" :
+                                   "0 0 12px rgba(99,102,241,0.2)"
+      } !important;
+    }
+      /* Heading transformations per mode */
+    h1, h2, h3 {
+      font-family: ${
+        mode === "competitive"   ? "'Space Grotesk', sans-serif" :
+        mode === "cozy"          ? "'Inter', sans-serif" :
+                                   "'Plus Jakarta Sans', sans-serif"
+      } !important;
+      text-transform: ${mode === "competitive" ? "uppercase" : "none"} !important;
+      letter-spacing: ${
+        mode === "competitive"   ? "0.08em" :
+        mode === "cozy"          ? "-0.01em" :
+                                   "0.02em"
+      } !important;
+      font-weight: ${
+        mode === "competitive"   ? "800" :
+        mode === "cozy"          ? "300" :
+                                   "600"
+      } !important;
+    }
+
+    /* Body text per mode */
+    p, span, label, button {
+      font-family: ${
+        mode === "competitive"   ? "'Space Grotesk', sans-serif" :
+        mode === "cozy"          ? "'Inter', sans-serif" :
+                                   "'Plus Jakarta Sans', sans-serif"
+      } !important;
+      font-weight: ${
+        mode === "competitive"   ? "600" :
+        mode === "cozy"          ? "300" :
+                                   "400"
+      } !important;
+      letter-spacing: ${
+        mode === "competitive"   ? "0.03em" :
+        mode === "cozy"          ? "0.01em" :
+                                   "0.01em"
+      } !important;
+    }
+  `;
+  document.head.appendChild(styleTag);
 }
 
 // ── Provider Component ─────────────────────────────────────────────────────
