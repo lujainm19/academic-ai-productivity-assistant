@@ -46,12 +46,19 @@ export function FocusSessionPage() {
   const [sessionLog, setSessionLog] = useState<SessionEntry[]>([]);
   const [showBurnoutWarning, setShowBurnoutWarning] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
-  const [useAdaptedDuration, setUseAdaptedDuration] = useState(true);
-  const [customDuration, setCustomDuration] = useState(25);
+  // Start with saved preference, not AI duration
+  const [useAdaptedDuration, setUseAdaptedDuration] = useState(false);
+  // Default custom duration reads from user's saved preference
+  const [customDuration, setCustomDuration] = useState(parseInt(savedSettings.focusDuration));
   const hasShownBurnoutWarning = useRef(false);
+  const [showBreakReminder, setShowBreakReminder] = useState(false);
+  const [showBreakStarted, setShowBreakStarted] = useState(false);
 
-  const focusDuration = (useAdaptedDuration ? adaptedPomoDuration : customDuration) * 60;
-  const breakDuration = (sessionCount >= 3 ? 20 : 5) * 60; // long break after 3 sessions if burnout risk is elevated
+  // Read focus and break duration from saved user preferences
+  const savedFocusMins = parseInt(savedSettings.focusDuration);
+  const savedBreakMins = parseInt(savedSettings.breakDuration);
+  const focusDuration = (useAdaptedDuration ? adaptedPomoDuration : savedFocusMins) * 60;
+  const breakDuration = (sessionCount >= 3 ? 20 : savedBreakMins) * 60;
 
   useEffect(() => {
     setTimeLeft(focusDuration);
@@ -64,6 +71,24 @@ export function FocusSessionPage() {
       hasShownBurnoutWarning.current = true;
     }
   }, [sessionCount, burnoutRisk]);
+
+  // Break reminder — fires 5 mins before break and when break starts
+// Only runs if user has break reminders enabled in preferences
+useEffect(() => {
+  if (!savedSettings.breakReminders) return;
+
+  // 5 minutes warning before focus ends
+  if (mode === "focus" && isRunning && timeLeft === 5 * 60) {
+    setShowBreakReminder(true);
+    setTimeout(() => setShowBreakReminder(false), 8000);
+  }
+
+  // Break just started
+  if (mode === "break" && timeLeft === breakDuration) {
+    setShowBreakStarted(true);
+    setTimeout(() => setShowBreakStarted(false), 8000);
+  }
+}, [timeLeft, mode, isRunning, savedSettings.breakReminders, breakDuration]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -149,6 +174,48 @@ export function FocusSessionPage() {
               <Sparkles className="size-4 text-primary shrink-0" />
               <p className="text-xs text-muted-foreground flex-1">{aiCheckIn.body}</p>
               <button onClick={() => {}} className="text-xs text-primary shrink-0">OK</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 5 minute warning banner */}
+        <AnimatePresence>
+          {showBreakReminder && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mx-6 mb-2 p-3 rounded-xl bg-amber-500/20 backdrop-blur-sm border border-amber-500/30 flex items-center gap-2"
+            >
+              <AlertCircle className="size-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-200 flex-1">⏰ Break in 5 minutes — finish up your current thought</p>
+              <button onClick={() => setShowBreakReminder(false)} className="text-xs text-amber-400 shrink-0">OK</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Break started banner */}
+        <AnimatePresence>
+          {showBreakStarted && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mx-6 mb-2 p-3 rounded-xl bg-green-500/20 backdrop-blur-sm border border-green-500/30 flex items-center gap-2"
+            >
+              <Activity className="size-4 text-green-400 shrink-0" />
+              <p className="text-xs text-green-200 flex-1">
+                {[
+                  "🍫 Go treat yourself to some chocolate, you earned it!",
+                  "📱 Doomscroll guilt-free for 5 minutes, we won't judge.",
+                  "🚶 Take a little walk, even just to the kitchen and back.",
+                  "💧 Hydrate! Your brain is basically a wrinkly water balloon.",
+                  "🐱 Go pet an animal if one is nearby. Mandatory.",
+                  "🪟 Stare out a window and think about absolutely nothing.",
+                  "🧃 Snack time. You studied hard, you deserve it.",
+                ][Math.floor(Math.random() * 7)]}
+              </p>
+              <button onClick={() => setShowBreakStarted(false)} className="text-xs text-green-400 shrink-0">OK</button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -251,10 +318,10 @@ export function FocusSessionPage() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="absolute top-20 right-6 p-6 rounded-2xl bg-card/90 backdrop-blur-xl border border-border shadow-2xl max-w-sm w-full z-30"
+              className="absolute top-20 right-6 p-6 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/20 shadow-2xl max-w-sm w-full z-30"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Environment</h3>
+                <h3 className="font-semibold text-white">Environment</h3>
                 <button onClick={() => setShowSettings(false)}>
                   <X className="size-5 text-muted-foreground hover:text-foreground" />
                 </button>
@@ -268,7 +335,7 @@ export function FocusSessionPage() {
                   >
                     <img src={env.image} alt={env.name} className="w-full h-24 object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent flex items-end p-2">
-                      <span className="text-xs font-medium">{env.name}</span>
+                      <span className="text-xs font-medium text-white">{env.name}</span>
                     </div>
                   </button>
                 ))}
@@ -276,7 +343,7 @@ export function FocusSessionPage() {
 
               {/* Task Switcher */}
               <div className="mt-4 border-t border-border pt-4">
-                <h4 className="text-sm font-medium mb-3">Current Task</h4>
+                <h4 className="text-sm font-medium mb-3 text-white">Current Task</h4>
                 <div className="space-y-2">
                   {currentTasks.map(task => (
                     <button
@@ -285,7 +352,7 @@ export function FocusSessionPage() {
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 ${selectedTask.id === task.id ? "bg-primary/20 border border-primary/40" : "bg-secondary hover:bg-secondary/80"}`}
                     >
                       <div className="size-2 rounded-full shrink-0" style={{ background: task.courseColor }} />
-                      <span className="flex-1 truncate">{task.title}</span>
+                      <span className="flex-1 truncate text-white/90">{task.title}</span>
                       {selectedTask.id === task.id && <CheckCircle2 className="size-4 text-primary shrink-0" />}
                     </button>
                   ))}
@@ -306,7 +373,7 @@ export function FocusSessionPage() {
               </div>
               <div className="flex items-center justify-center gap-2 mb-2">
                 <div className="size-2 rounded-full shrink-0" style={{ background: selectedTask.courseColor }} />
-                <h2 className="text-2xl text-muted-foreground">{selectedTask.title}</h2>
+                <h2 className="text-2xl text-white/90 drop-shadow-md">{selectedTask.title}</h2>
               </div>
               {inPeakWindow && (
                 <motion.div
@@ -338,12 +405,12 @@ export function FocusSessionPage() {
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-8xl font-bold tabular-nums tracking-tight">
+                  <div className="text-8xl font-bold tabular-nums tracking-tight text-white drop-shadow-lg">
                     {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
                   </div>
-                  <div className="text-sm text-muted-foreground mt-2">
+                  <div className="text-sm text-white/70 mt-2 drop-shadow-md">
                     {mode === "focus" ? "Until break" : "Until next focus"}
-                  </div>
+                </div>
                   {isRunning && (
                     <div className="mt-2 flex items-center justify-center gap-1 text-xs text-primary">
                       <Brain className="size-3" />
