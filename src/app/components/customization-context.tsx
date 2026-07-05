@@ -20,7 +20,6 @@ export interface CustomizationSettings {
   studyMode: StudyMode;
   themeId: ThemeId;
   environmentId: EnvironmentId;
-  ambientSounds: boolean;
   breakReminders: boolean;
   focusDuration: FocusDuration;
   breakDuration: BreakDuration;
@@ -35,7 +34,6 @@ export const DEFAULT_SETTINGS: CustomizationSettings = {
   studyMode: "cozy",           // start in cozy mode
   themeId: "midnight",         // midnight blue color theme
   environmentId: "cafe",       // rainy café as the focus background
-  ambientSounds: true,         // ambient sounds on by default
   breakReminders: true,        // break reminders on by default
   focusDuration: "25",         // classic 25-min pomodoro
   breakDuration: "5",          // 5-min break
@@ -102,7 +100,6 @@ interface CustomizationContextValue {
   setStudyMode: (mode: StudyMode) => void;
   setTheme: (id: ThemeId) => void;
   setEnvironment: (id: EnvironmentId) => void;
-  setAmbientSounds: (v: boolean) => void;
   setBreakReminders: (v: boolean) => void;
   setFocusDuration: (v: FocusDuration) => void;
   setBreakDuration: (v: BreakDuration) => void;
@@ -343,7 +340,6 @@ useEffect(() => {
   const setStudyMode          = (v: StudyMode)       => setDraft(d => ({ ...d, studyMode: v }));
   const setTheme              = (v: ThemeId)          => setDraft(d => ({ ...d, themeId: v }));
   const setEnvironment        = (v: EnvironmentId)    => setDraft(d => ({ ...d, environmentId: v }));
-  const setAmbientSounds      = (v: boolean)          => setDraft(d => ({ ...d, ambientSounds: v }));
   const setBreakReminders     = (v: boolean)          => setDraft(d => ({ ...d, breakReminders: v }));
   const setFocusDuration      = (v: FocusDuration)    => setDraft(d => ({ ...d, focusDuration: v }));
   const setBreakDuration      = (v: BreakDuration)    => setDraft(d => ({ ...d, breakDuration: v }));
@@ -380,7 +376,7 @@ useEffect(() => {
       savedMode: saved.studyMode,
       savedSettings: saved,
       setStudyMode, setTheme, setEnvironment,
-      setAmbientSounds, setBreakReminders,
+      setBreakReminders,
       setFocusDuration, setBreakDuration, setDefaultEnvironment,
       saveChanges, resetToDefault,
       hasUnsavedChanges,

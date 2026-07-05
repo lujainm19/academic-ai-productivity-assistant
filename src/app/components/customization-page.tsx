@@ -4,7 +4,7 @@
 // nothing here is hardcoded, every selection updates the app's state.
 
 import { motion } from "motion/react";
-import { Palette, Moon, Volume2, Bell, Zap, Heart, Users, Sparkles, Check } from "lucide-react";
+import { Palette, Moon, Bell, Zap, Heart, Users, Sparkles, Check } from "lucide-react";
 import { useCustomization } from "./customization-context";
 import type { ThemeId, EnvironmentId, StudyMode } from "./customization-context";
 
@@ -68,7 +68,6 @@ export function CustomizationPage() {
     setStudyMode,
     setTheme,
     setEnvironment,
-    setAmbientSounds,
     setBreakReminders,
     setFocusDuration,
     setBreakDuration,
@@ -229,28 +228,6 @@ export function CustomizationPage() {
 
             {/* Toggle switches */}
             <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-
-              {/* Ambient Sounds toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Volume2 className="size-5 text-primary" />
-                  <div>
-                    <h4 className="font-medium">Ambient Sounds</h4>
-                    <p className="text-sm text-muted-foreground">Background audio during focus</p>
-                  </div>
-                </div>
-                {/* Custom toggle switch — green when on, muted when off */}
-                <button
-                  onClick={() => setAmbientSounds(!settings.ambientSounds)}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${
-                    settings.ambientSounds ? "bg-primary" : "bg-secondary"
-                  }`}
-                >
-                  <span className={`absolute top-1 size-4 rounded-full bg-white transition-all ${
-                    settings.ambientSounds ? "left-6" : "left-1"
-                  }`} />
-                </button>
-              </div>
 
               {/* Break Reminders toggle */}
               <div className="flex items-center justify-between">

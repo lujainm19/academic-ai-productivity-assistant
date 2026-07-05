@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Play, Pause, SkipForward, Settings, Volume2, X, ChevronLeft, Brain, Sparkles, Activity, Clock, CheckCircle2, AlertCircle, Zap } from "lucide-react";
+import { Play, Pause, SkipForward, Settings, X, ChevronLeft, Brain, Sparkles, Activity, Clock, CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useAIEngine, productivityPatterns } from "./ai-engine-context";
@@ -155,9 +155,6 @@ useEffect(() => {
           <div className="flex items-center gap-3">
             <button onClick={() => setShowSettings(!showSettings)} className="p-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all">
               <Settings className="size-5 text-white" />
-            </button>
-            <button className="p-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all">
-              <Volume2 className="size-5 text-white" />
             </button>
           </div>
         </nav>
