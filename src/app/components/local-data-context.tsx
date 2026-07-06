@@ -35,6 +35,7 @@ interface LocalDataContextValue {
   deleteTask: (id: string) => void;
   pendingBadgeUnlocks: Badge[];
   dismissBadgeUnlock: (id: string) => void;
+  resetProgress: () => void;
 }
 
 const LocalDataContext = createContext<LocalDataContextValue | null>(null);
@@ -190,8 +191,18 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
     setTasks(prev => prev.filter(t => t.id !== id));
   };
 
+  // Wipes everything gamification/task-related back to a brand-new-install
+  // state. Customization settings (theme, study mode, etc.) live under a
+  // separate key and are intentionally left untouched.
+  const resetProgress = useCallback(() => {
+    setTasks([]);
+    setStats({ xp: 0, level: 1, streak: 0, lastActiveDate: null, tasksCompleted: 0 });
+    setUnlockedBadgeIds([]);
+    setPendingBadgeUnlocks([]);
+  }, []);
+
   return (
-    <LocalDataContext.Provider value={{ tasks, stats, addTask, completeTask, deleteTask, pendingBadgeUnlocks, dismissBadgeUnlock }}>
+    <LocalDataContext.Provider value={{ tasks, stats, addTask, completeTask, deleteTask, pendingBadgeUnlocks, dismissBadgeUnlock, resetProgress }}>
       {children}
     </LocalDataContext.Provider>
   );
