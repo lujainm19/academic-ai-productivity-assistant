@@ -1,40 +1,48 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
+import { useLocalData, Task } from "./local-data-context";
+import { toLocalDateStr } from "../lib/date";
 
 // ── Mock Canvas LMS Data ─────────────────────────────────────────────────────
+function daysFromToday(offset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return toLocalDateStr(d);
+}
+
 export const canvasCourses = [
   {
     id: "cosc125", name: "COSC125 - Intro to Programming", color: "#6366f1",
     assignments: [
-      { id: "a1", title: "Assignment 3", due: "2026-05-29", weight: 15, difficulty: 3, estimatedHours: 2.5, submitted: false },
-      { id: "a2", title: "Quiz 5", due: "2026-06-01", weight: 5, difficulty: 2, estimatedHours: 0.5, submitted: false },
-      { id: "a3", title: "Final Project Proposal", due: "2026-06-10", weight: 20, difficulty: 4, estimatedHours: 4, submitted: false },
+      { id: "a1", title: "Assignment 3", due: daysFromToday(1), weight: 15, difficulty: 3, estimatedHours: 2.5, submitted: false },
+      { id: "a2", title: "Quiz 5", due: daysFromToday(4), weight: 5, difficulty: 2, estimatedHours: 0.5, submitted: false },
+      { id: "a3", title: "Final Project Proposal", due: daysFromToday(13), weight: 20, difficulty: 4, estimatedHours: 4, submitted: false },
     ]
   },
   {
     id: "bio201", name: "BIO201 - Cell Biology", color: "#10b981",
     assignments: [
-      { id: "b1", title: "Chapter 7 Reading Notes", due: "2026-05-30", weight: 5, difficulty: 2, estimatedHours: 1, submitted: false },
-      { id: "b2", title: "Lab Report 4", due: "2026-06-03", weight: 15, difficulty: 3, estimatedHours: 3, submitted: false },
+      { id: "b1", title: "Chapter 7 Reading Notes", due: daysFromToday(2), weight: 5, difficulty: 2, estimatedHours: 1, submitted: false },
+      { id: "b2", title: "Lab Report 4", due: daysFromToday(6), weight: 15, difficulty: 3, estimatedHours: 3, submitted: false },
     ]
   },
   {
     id: "math210", name: "MATH210 - Calculus II", color: "#f59e0b",
     assignments: [
-      { id: "m1", title: "Problem Set 8", due: "2026-05-31", weight: 10, difficulty: 4, estimatedHours: 1.5, submitted: false },
-      { id: "m2", title: "Midterm Review", due: "2026-06-07", weight: 25, difficulty: 5, estimatedHours: 5, submitted: false },
+      { id: "m1", title: "Problem Set 8", due: daysFromToday(3), weight: 10, difficulty: 4, estimatedHours: 1.5, submitted: false },
+      { id: "m2", title: "Midterm Review", due: daysFromToday(10), weight: 25, difficulty: 5, estimatedHours: 5, submitted: false },
     ]
   },
   {
     id: "eng102", name: "ENG102 - Composition", color: "#ec4899",
     assignments: [
-      { id: "e1", title: "Essay Outline", due: "2026-06-02", weight: 8, difficulty: 2, estimatedHours: 0.75, submitted: false },
-      { id: "e2", title: "Rough Draft", due: "2026-06-09", weight: 20, difficulty: 3, estimatedHours: 3, submitted: false },
+      { id: "e1", title: "Essay Outline", due: daysFromToday(5), weight: 8, difficulty: 2, estimatedHours: 0.75, submitted: false },
+      { id: "e2", title: "Rough Draft", due: daysFromToday(12), weight: 20, difficulty: 3, estimatedHours: 3, submitted: false },
     ]
   },
   {
     id: "phys110", name: "PHYS110 - Physics I", color: "#8b5cf6",
     assignments: [
-      { id: "p1", title: "Lab Report", due: "2026-06-03", weight: 15, difficulty: 4, estimatedHours: 3, submitted: false },
+      { id: "p1", title: "Lab Report", due: daysFromToday(6), weight: 15, difficulty: 4, estimatedHours: 3, submitted: false },
     ]
   }
 ];
@@ -136,43 +144,41 @@ export interface AIEngineState {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function computeWorkloadByDay(): WorkloadDay[] {
-  const today = new Date("2026-05-28");
-  const days = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
-  const labels = ["Today", "Fri 5/29", "Sat 5/30", "Sun 5/31", "Mon 6/1", "Tue 6/2", "Wed 6/3"];
+// Hours a manually-added task is assumed to need, since (unlike Canvas
+// assignments) it doesn't carry its own estimatedHours.
+const HOURS_PER_TASK = { high: 1.5, medium: 1 } as const;
 
-  return days.map((day, i) => {
+// Driven only by the user's real tasks - deliberately ignores the mock
+// canvasCourses/calendarEvents demo data used elsewhere (task-planner-page),
+// since a day should only look busy because of something the user actually
+// has to do, not permanently-fake lectures they can't act on or clear.
+function computeWorkloadByDay(tasks: Task[]): WorkloadDay[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const activeTasks = tasks.filter(t => !t.completed && t.dueDate);
+
+  return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
-    const dateStr = date.toISOString().split("T")[0];
+    const dayAbbr = date.toLocaleDateString("en-US", { weekday: "short" });
+    const label = i === 0 ? "Today" : `${dayAbbr} ${date.getMonth() + 1}/${date.getDate()}`;
+    const dateStr = toLocalDateStr(date);
 
-    // Count assignments due on or very near this date
     let hoursNeeded = 0;
     let deadlinesOnDay = 0;
 
-    canvasCourses.forEach(course => {
-      course.assignments.forEach(a => {
-        const dueDate = new Date(a.due);
-        const diff = Math.ceil((dueDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        if (diff >= 0 && diff <= 1) {
-          deadlinesOnDay++;
-          hoursNeeded += a.estimatedHours * 0.6; // partial prep weight
-        } else if (diff === 2) {
-          hoursNeeded += a.estimatedHours * 0.3;
-        }
-      });
+    activeTasks.forEach(t => {
+      if (t.dueDate === dateStr) {
+        deadlinesOnDay++;
+        hoursNeeded += HOURS_PER_TASK[t.priority];
+      }
     });
 
-    // Add class time from calendar
-    const classHours = calendarEvents
-      .filter(e => e.day === day.slice(0, 3))
-      .reduce((acc, e) => acc + (e.endHour - e.startHour), 0);
+    const freeHours = Math.max(0, 14 - hoursNeeded);
+    const workloadScore = Math.min(100, Math.round((hoursNeeded / 10) * 100));
 
-    const totalBusy = classHours + hoursNeeded;
-    const freeHours = Math.max(0, 14 - totalBusy); // assume 14 usable hours/day
-    const workloadScore = Math.min(100, Math.round((totalBusy / 10) * 100));
-
-    return { day: days[i], label: labels[i], workloadScore, totalHoursNeeded: hoursNeeded, deadlines: deadlinesOnDay, freeHours };
+    return { day: dayAbbr, label, workloadScore, totalHoursNeeded: hoursNeeded, deadlines: deadlinesOnDay, freeHours };
   });
 }
 
@@ -185,26 +191,75 @@ function computeBurnoutRisk(): number {
   return risk;
 }
 
-function generateInsights(): AIInsight[] {
+// Insights generated live from whatever tasks the user currently has. This
+// list is recomputed on every task add/complete/delete (see useMemo below),
+// so it's the natural place to plug in future agent-driven reminders too.
+function generateTaskInsights(tasks: Task[]): AIInsight[] {
+  const now = new Date();
+  const todayStr = toLocalDateStr(now);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = toLocalDateStr(tomorrow);
+
+  const active = tasks.filter(t => !t.completed);
+  const overdue = active.filter(t => t.dueDate && t.dueDate < todayStr);
+  const dueToday = active.filter(t => t.dueDate === todayStr);
+  const dueTomorrow = active.filter(t => t.dueDate === tomorrowStr);
+
+  const insights: AIInsight[] = [];
+
+  if (overdue.length > 0) {
+    insights.push({
+      id: "task-overdue",
+      type: "deadline", priority: "urgent", confidence: 97,
+      title: overdue.length === 1 ? "1 Task Overdue" : `${overdue.length} Tasks Overdue`,
+      body: overdue.length === 1
+        ? `"${overdue[0].title}" was due ${new Date(overdue[0].dueDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Tackle it first before it piles up.`
+        : `Including "${overdue[0].title}" and ${overdue.length - 1} more. Clearing these first will free up your week.`,
+      timestamp: now, dismissed: false
+    });
+  }
+
+  if (dueToday.length > 0) {
+    insights.push({
+      id: "task-due-today",
+      type: "schedule", priority: "high", confidence: 92,
+      title: dueToday.length === 1 ? "1 Task Due Today" : `${dueToday.length} Tasks Due Today`,
+      body: dueToday.length === 1
+        ? `"${dueToday[0].title}" is due today — a good next task to start now.`
+        : `Including "${dueToday[0].title}" and ${dueToday.length - 1} more. Consider tackling these before anything else.`,
+      timestamp: now, dismissed: false
+    });
+  }
+
+  if (dueTomorrow.length > 0) {
+    insights.push({
+      id: "task-due-tomorrow",
+      type: "schedule", priority: "medium", confidence: 85,
+      title: dueTomorrow.length === 1 ? "1 Task Due Tomorrow" : `${dueTomorrow.length} Tasks Due Tomorrow`,
+      body: `"${dueTomorrow[0].title}"${dueTomorrow.length > 1 ? ` and ${dueTomorrow.length - 1} more` : ""} due tomorrow — worth planning time for today.`,
+      timestamp: now, dismissed: false
+    });
+  }
+
+  if (active.length === 0) {
+    insights.push({
+      id: "task-all-clear",
+      type: "celebration", priority: "low", confidence: 100,
+      title: "All Caught Up",
+      body: "No active tasks right now. Add one whenever you're ready, or enjoy the break.",
+      timestamp: now, dismissed: false
+    });
+  }
+
+  return insights;
+}
+
+// Illustrative, pattern-based insights that aren't tied to specific tasks
+// (peak-hours detection, burnout, integration status, streaks).
+function generateBaseInsights(): AIInsight[] {
   const now = new Date();
   return [
-    {
-      id: "ins-1", type: "schedule", priority: "urgent", confidence: 94,
-      title: "Critical Deadline Tomorrow",
-      body: "COSC125 Assignment 3 is due tomorrow. Based on your pace and 2.5h estimate, start at 7 PM tonight during your peak focus window.",
-      action: "schedule-cosc125",
-      actionLabel: "Schedule Now",
-      course: "COSC125", courseColor: "#6366f1",
-      timestamp: now, dismissed: false
-    },
-    {
-      id: "ins-2", type: "deadline", priority: "high", confidence: 88,
-      title: "3 Deadlines This Week",
-      body: "COSC125 (Thu), Bio Notes (Fri), Math Problems (Sat). Your Tuesday afternoon is free — ideal for getting ahead on Math.",
-      action: "plan-week",
-      actionLabel: "View Week Plan",
-      timestamp: now, dismissed: false
-    },
     {
       id: "ins-3", type: "optimization", priority: "medium", confidence: 91,
       title: "Peak Hours Detected",
@@ -251,15 +306,23 @@ function generateSmartSchedule(): SmartScheduleBlock[] {
   ];
 }
 
+function minutesAgo(m: number): Date {
+  return new Date(Date.now() - m * 60 * 1000);
+}
+
+function hoursAgo(h: number): Date {
+  return new Date(Date.now() - h * 60 * 60 * 1000);
+}
+
 function generateAgentLog() {
   return [
-    { id: "log-1", timestamp: new Date("2026-05-28T08:30:00"), action: "Canvas Sync", detail: "Pulled 8 assignments from 5 courses", impact: "Study plan updated with 3 new blocks" },
-    { id: "log-2", timestamp: new Date("2026-05-28T08:31:00"), action: "Schedule Optimization", detail: "Moved Bio reading from Wed → Mon (low performance pattern)", impact: "Projected focus score +12%" },
-    { id: "log-3", timestamp: new Date("2026-05-28T08:31:30"), action: "Priority Reorder", detail: "Elevated COSC125 A3 to critical — due in 1 day", impact: "Added urgent insight card" },
-    { id: "log-4", timestamp: new Date("2026-05-28T08:32:00"), action: "Burnout Detection", detail: "5-day rolling average: 130 min/day → moderate risk", impact: "Suggested session cap for today" },
-    { id: "log-5", timestamp: new Date("2026-05-28T08:32:30"), action: "Pomodoro Adaptation", detail: "Task type is deep work; extended session to 35 min", impact: "Estimated 18% better retention" },
-    { id: "log-6", timestamp: new Date("2026-05-27T21:15:00"), action: "Focus Pattern Update", detail: "Confirmed peak window 7–10 PM (92% focus score)", impact: "All deep tasks rescheduled to evenings" },
-    { id: "log-7", timestamp: new Date("2026-05-27T10:00:00"), action: "Google Calendar Sync", detail: "Detected 9 class blocks and 1 study group event", impact: "Free windows mapped for study scheduling" },
+    { id: "log-1", timestamp: minutesAgo(32), action: "Canvas Sync", detail: "Pulled 8 assignments from 5 courses", impact: "Study plan updated with 3 new blocks" },
+    { id: "log-2", timestamp: minutesAgo(31), action: "Schedule Optimization", detail: "Moved Bio reading from Wed → Mon (low performance pattern)", impact: "Projected focus score +12%" },
+    { id: "log-3", timestamp: minutesAgo(30.5), action: "Priority Reorder", detail: "Elevated COSC125 A3 to critical — due in 1 day", impact: "Added urgent insight card" },
+    { id: "log-4", timestamp: minutesAgo(30), action: "Burnout Detection", detail: "5-day rolling average: 130 min/day → moderate risk", impact: "Suggested session cap for today" },
+    { id: "log-5", timestamp: minutesAgo(29.5), action: "Pomodoro Adaptation", detail: "Task type is deep work; extended session to 35 min", impact: "Estimated 18% better retention" },
+    { id: "log-6", timestamp: hoursAgo(11.5), action: "Focus Pattern Update", detail: "Confirmed peak window 7–10 PM (92% focus score)", impact: "All deep tasks rescheduled to evenings" },
+    { id: "log-7", timestamp: hoursAgo(23), action: "Google Calendar Sync", detail: "Detected 9 class blocks and 1 study group event", impact: "Free windows mapped for study scheduling" },
   ];
 }
 
@@ -267,11 +330,19 @@ function generateAgentLog() {
 const AIEngineContext = createContext<AIEngineState | null>(null);
 
 export function AIEngineProvider({ children }: { children: ReactNode }) {
-  const [insights, setInsights] = useState<AIInsight[]>(generateInsights());
+  const { tasks } = useLocalData();
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAnalyzed, setLastAnalyzed] = useState(new Date());
 
-  const workloadByDay = computeWorkloadByDay();
+  // Recomputed whenever tasks change, so the suggestions box and week-ahead
+  // workload stay in sync with whatever the user has actually added.
+  const insights = useMemo(() => {
+    const combined = [...generateTaskInsights(tasks), ...generateBaseInsights()];
+    return combined.map(ins => ({ ...ins, dismissed: dismissedIds.has(ins.id) }));
+  }, [tasks, dismissedIds]);
+
+  const workloadByDay = useMemo(() => computeWorkloadByDay(tasks), [tasks]);
   const burnoutRisk = computeBurnoutRisk();
   const smartSchedule = generateSmartSchedule();
   const agentActionLog = generateAgentLog();
@@ -294,11 +365,11 @@ export function AIEngineProvider({ children }: { children: ReactNode }) {
   ];
 
   const dismissInsight = useCallback((id: string) => {
-    setInsights(prev => prev.map(ins => ins.id === id ? { ...ins, dismissed: true } : ins));
+    setDismissedIds(prev => new Set(prev).add(id));
   }, []);
 
   const acceptSuggestion = useCallback((id: string) => {
-    setInsights(prev => prev.map(ins => ins.id === id ? { ...ins, dismissed: true } : ins));
+    setDismissedIds(prev => new Set(prev).add(id));
   }, []);
 
   const triggerRescan = useCallback(() => {

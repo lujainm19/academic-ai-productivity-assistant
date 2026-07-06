@@ -1,17 +1,11 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Play, ChevronRight, RefreshCw, CheckCircle2, Plus, X, Lightbulb } from "lucide-react";
+import { Play, ChevronRight, RefreshCw, CheckCircle2, Plus, X, Lightbulb, Calendar } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
+import confetti from "canvas-confetti";
 import { useAIEngine } from "./ai-engine-context";
-
-let nextId = 100;
-
-const initialTasks = [
-  { id: 1, title: "COSC125 Assignment 3", due: "Tomorrow", priority: "high", duration: "2h" },
-  { id: 2, title: "Read Chapter 7 - Biology", due: "In 2 days", priority: "medium", duration: "1h" },
-  { id: 3, title: "Math Practice Problems", due: "In 3 days", priority: "medium", duration: "1.5h" },
-  { id: 4, title: "Essay Outline - English", due: "In 6 days", priority: "low", duration: "45m" }
-];
+import { useLocalData } from "./local-data-context";
+import { toLocalDateStr } from "../lib/date";
 
 function WeekAhead({ days }: { days: ReturnType<typeof useAIEngine>["workloadByDay"] }) {
   const busiest = days.reduce((max, d) => (d.workloadScore > max.workloadScore ? d : max), days[0]);
@@ -37,20 +31,101 @@ function WeekAhead({ days }: { days: ReturnType<typeof useAIEngine>["workloadByD
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { insights, workloadByDay, adaptedPomoDuration, isAnalyzing, triggerRescan, dismissInsight } = useAIEngine();
+  const { tasks, stats, addTask, completeTask, deleteTask, pendingBadgeUnlocks, dismissBadgeUnlock } = useLocalData();
+  const { insights, workloadByDay, adaptedPomoDuration, isAnalyzing, dismissInsight } = useAIEngine();
   const topInsight = insights.find(i => !i.dismissed);
 
-  const [tasks, setTasks] = useState(initialTasks);
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
   const [showAddInput, setShowAddInput] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const dueOptions = ["Today", "Tomorrow", "This week"] as const;
+  const [newTaskDue, setNewTaskDue] = useState<string>("Today");
+  const [customDate, setCustomDate] = useState("");
+  const customDateInputRef = useRef<HTMLInputElement>(null);
 
-  // Checking a task off marks it briefly, then removes it from the list entirely.
-  const completeTask = (id: number) => {
-    setCheckedIds(prev => new Set(prev).add(id));
+  // Show unlocks one at a time; a fun little side-cannon confetti burst
+  // plus an auto-dismissing toast celebrates each new badge as it lands.
+  const currentBadge = pendingBadgeUnlocks[0] ?? null;
+  useEffect(() => {
+    if (!currentBadge) return;
+    confetti({
+      particleCount: 70,
+      spread: 100,
+      startVelocity: 42,
+      gravity: 0.9,
+      scalar: 1,
+      origin: { x: 0.5, y: 0.25 },
+      colors: ["#facc15", "#6366f1", "#22c55e", "#ec4899", "#38bdf8"],
+    });
+    const timer = setTimeout(() => dismissBadgeUnlock(currentBadge.id), 5000);
+    return () => clearTimeout(timer);
+  }, [currentBadge, dismissBadgeUnlock]);
+
+  // `completedToday` below is computed fresh on every render from the real
+  // clock, but nothing re-renders this component by itself as midnight
+  // passes - a tab left open overnight would keep showing yesterday's list
+  // until some unrelated state change happened to re-render it. This tick
+  // forces one: a timer fires just after the next local midnight, then
+  // reschedules itself for the following one, and a visibilitychange check
+  // catches the case where the tab was backgrounded/throttled right through
+  // the boundary.
+  const [, setMidnightTick] = useState(0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleNext = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+      timer = setTimeout(() => {
+        setMidnightTick(t => t + 1);
+        scheduleNext();
+      }, nextMidnight.getTime() - now.getTime());
+    };
+    scheduleNext();
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setMidnightTick(t => t + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  // Only ever show items finished on today's real calendar date. This reads
+  // straight from localStorage-backed state, so it's correct after a page
+  // navigation or a full refresh - not just while the tab happens to stay open.
+  const completedToday = tasks.filter(
+    t => t.completed && t.completedAt && new Date(t.completedAt).toDateString() === new Date().toDateString()
+  );
+  const activeTasks = tasks.filter(t => !t.completed);
+  const todayTasks = activeTasks.filter(t => t.priority === "high");
+  const laterTasks = activeTasks.filter(t => t.priority !== "high");
+  const upNext = activeTasks[0];
+
+  // Show the checkmark for a beat, then let the task actually leave the
+  // active list (it moves into "Completed today" below instead of vanishing).
+  const handleComplete = (id: string, e: MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const origin = {
+      x: (rect.left + rect.width / 2) / window.innerWidth,
+      y: (rect.top + rect.height / 2) / window.innerHeight,
+    };
+
+    setCheckingIds(prev => new Set(prev).add(id));
     setTimeout(() => {
-      setTasks(prev => prev.filter(t => t.id !== id));
-      setCheckedIds(prev => {
+      const { isLate } = completeTask(id);
+      confetti({
+        particleCount: 16,
+        spread: 55,
+        startVelocity: 25,
+        gravity: 1.2,
+        scalar: 0.75,
+        ticks: 60,
+        origin,
+        colors: isLate ? ["#f59e0b", "#fbbf24", "#94a3b8"] : ["#22c55e", "#6366f1", "#facc15"],
+      });
+      setCheckingIds(prev => {
         const next = new Set(prev);
         next.delete(id);
         return next;
@@ -58,41 +133,82 @@ export function DashboardPage() {
     }, 450);
   };
 
-  const deleteTask = (id: number) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const isoDaysFromNow = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return toLocalDateStr(d);
   };
 
-  const addTask = () => {
+  const handleAddTask = () => {
     const title = newTaskTitle.trim();
     if (!title) {
       setShowAddInput(false);
       return;
     }
-    setTasks(prev => [{ id: nextId++, title, due: "Today", priority: "high", duration: "" }, ...prev]);
+    const dueDate = customDate
+      ? customDate
+      : newTaskDue === "Today"
+      ? isoDaysFromNow(0)
+      : newTaskDue === "Tomorrow"
+      ? isoDaysFromNow(1)
+      : isoDaysFromNow(6);
+    const due = customDate
+      ? new Date(customDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : newTaskDue;
+    const priority = due === "Today" || due === "Tomorrow" ? "high" : "medium";
+    addTask(title, due, priority, dueDate);
     setNewTaskTitle("");
+    setCustomDate("");
+    setNewTaskDue("Today");
     setShowAddInput(false);
   };
 
-  const todayTasks = tasks.filter(t => t.priority === "high");
-  const laterTasks = tasks.filter(t => t.priority !== "high");
-  const upNext = tasks[0];
-
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
-      <div className="max-w-6xl mx-auto space-y-4">
+    <div className="min-h-screen bg-background text-foreground p-6 overflow-x-auto">
+      <AnimatePresence>
+        {currentBadge && (
+          <motion.div
+            key={currentBadge.id}
+            initial={{ opacity: 0, y: -24, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            className="fixed top-6 right-6 z-50 w-80 p-4 rounded-2xl bg-gradient-to-br from-primary/20 via-card to-card border border-primary/40 shadow-2xl shadow-primary/20 flex items-start gap-3"
+          >
+            <motion.div
+              initial={{ rotate: 0 }}
+              animate={{ rotate: [0, -12, 12, -8, 8, 0] }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="size-12 rounded-xl bg-primary/15 flex items-center justify-center text-2xl shrink-0"
+            >
+              {currentBadge.emoji}
+            </motion.div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] uppercase tracking-wide text-primary font-semibold mb-0.5">Badge unlocked!</p>
+              <p className="text-sm font-semibold">{currentBadge.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{currentBadge.description}</p>
+            </div>
+            <button
+              onClick={() => dismissBadgeUnlock(currentBadge.id)}
+              className="shrink-0 p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss badge notification"
+            >
+              <X className="size-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div className="max-w-6xl min-w-[860px] mx-auto space-y-4">
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
             {todayTasks.length > 0 && ` · ${todayTasks.length} due today`}
           </p>
-          <button
-            onClick={triggerRescan}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:border-primary/50 text-sm transition-all"
-          >
-            <RefreshCw className={`size-4 ${isAnalyzing ? "animate-spin text-primary" : "text-muted-foreground"}`} />
-            <span className="hidden sm:block">{isAnalyzing ? "Analyzing..." : "Re-scan"}</span>
-          </button>
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            {isAnalyzing && <RefreshCw className="size-3 animate-spin text-primary" />}
+            {isAnalyzing ? "Syncing..." : "Saved"}
+          </p>
         </div>
 
         {upNext ? (
@@ -117,12 +233,13 @@ export function DashboardPage() {
         ) : (
           <div className="w-full flex items-center gap-3 p-5 rounded-2xl bg-card border border-border">
             <CheckCircle2 className="size-6 text-green-500" />
-            <p className="font-medium">All caught up! Nothing left to schedule.</p>
+            <p className="font-medium">All caught up! Add a task below whenever you're ready.</p>
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 p-5 rounded-2xl bg-card border border-border">
+        <div className="grid grid-cols-3 gap-4">
+          <div className="col-span-2 space-y-4">
+          <div className="p-5 rounded-2xl bg-card border border-border">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium">Tasks</h2>
               <button
@@ -142,15 +259,62 @@ export function DashboardPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden mb-3"
                 >
-                  <input
-                    autoFocus
-                    value={newTaskTitle}
-                    onChange={e => setNewTaskTitle(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addTask()}
-                    onBlur={addTask}
-                    placeholder="Add a task and press Enter"
-                    className="w-full px-3 py-2 rounded-lg bg-secondary/40 border border-border text-sm outline-none focus:border-primary/50"
-                  />
+                  <div className="p-3 rounded-lg bg-secondary/30 border border-border space-y-2">
+                    <input
+                      autoFocus
+                      value={newTaskTitle}
+                      onChange={e => setNewTaskTitle(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAddTask()}
+                      placeholder="Add a task..."
+                      className="w-full px-2 py-1.5 bg-transparent text-sm outline-none"
+                    />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {dueOptions.map(opt => (
+                        <button
+                          key={opt}
+                          onClick={() => { setNewTaskDue(opt); setCustomDate(""); }}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            newTaskDue === opt && !customDate
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/30"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const input = customDateInputRef.current;
+                          if (!input) return;
+                          if (typeof input.showPicker === "function") {
+                            input.showPicker();
+                          } else {
+                            input.focus();
+                            input.click();
+                          }
+                        }}
+                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border cursor-pointer transition-colors ${customDate ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/30"}`}
+                      >
+                        <Calendar className="size-3.5" />
+                        {customDate ? new Date(customDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Pick date"}
+                        <input
+                          ref={customDateInputRef}
+                          type="date"
+                          value={customDate}
+                          onChange={e => setCustomDate(e.target.value)}
+                          className="sr-only"
+                          tabIndex={-1}
+                        />
+                      </button>
+                      <button
+                        onClick={handleAddTask}
+                        className="ml-auto text-xs px-3 py-1 rounded-full bg-primary text-primary-foreground hover:opacity-90"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -160,7 +324,7 @@ export function DashboardPage() {
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Today</p>
                 <AnimatePresence initial={false}>
                   {todayTasks.map(task => {
-                    const done = checkedIds.has(task.id);
+                    const done = checkingIds.has(task.id);
                     return (
                       <motion.div
                         key={task.id}
@@ -172,7 +336,7 @@ export function DashboardPage() {
                         className="flex items-center gap-3 py-2.5 border-t border-border group"
                       >
                         <button
-                          onClick={() => completeTask(task.id)}
+                          onClick={(e) => handleComplete(task.id, e)}
                           className={`size-[22px] rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${done ? "border-green-500 bg-green-500/20" : "border-border hover:border-primary"}`}
                           aria-label={`Mark ${task.title} as done`}
                         >
@@ -199,7 +363,7 @@ export function DashboardPage() {
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-4 mb-1">Later this week</p>
                 <AnimatePresence initial={false}>
                   {laterTasks.map(task => {
-                    const done = checkedIds.has(task.id);
+                    const done = checkingIds.has(task.id);
                     return (
                       <motion.div
                         key={task.id}
@@ -211,7 +375,7 @@ export function DashboardPage() {
                         className="flex items-center gap-3 py-2.5 border-t border-border group"
                       >
                         <button
-                          onClick={() => completeTask(task.id)}
+                          onClick={(e) => handleComplete(task.id, e)}
                           className={`size-[22px] rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${done ? "border-green-500 bg-green-500/20" : "border-border hover:border-primary"}`}
                           aria-label={`Mark ${task.title} as done`}
                         >
@@ -233,12 +397,37 @@ export function DashboardPage() {
               </>
             )}
 
-            {tasks.length === 0 && (
+            {activeTasks.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 <CheckCircle2 className="size-8 mx-auto mb-2 text-green-500 opacity-50" />
-                All tasks cleared!
+                No tasks yet. Add one above to get started.
               </div>
             )}
+          </div>
+
+          {completedToday.length > 0 && (
+            <div className="p-4 rounded-xl bg-card border border-border">
+              <h3 className="text-sm font-medium mb-2">Completed today</h3>
+              <AnimatePresence initial={false}>
+                {completedToday.map(task => (
+                  <motion.div
+                    key={task.id}
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-3 py-2 border-t border-border first:border-t-0"
+                  >
+                    <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+                    <p className="text-sm flex-1 min-w-0 truncate text-muted-foreground line-through">{task.title}</p>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {task.completedAt && new Date(task.completedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    </span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
           </div>
 
           <div className="space-y-4">
@@ -249,27 +438,27 @@ export function DashboardPage() {
                   cx="24" cy="24" r="20" fill="none"
                   stroke="var(--color-primary)" strokeWidth="4"
                   strokeDasharray={2 * Math.PI * 20}
-                  strokeDashoffset={2 * Math.PI * 20 * (1 - 0.62)}
+                  strokeDashoffset={2 * Math.PI * 20 * (1 - ((stats.xp % 500) / 500))}
                   strokeLinecap="round"
                   transform="rotate(-90 24 24)"
                 />
               </svg>
               <div>
-                <p className="text-sm font-medium">Level 8 · 12 day streak</p>
-                <p className="text-xs text-muted-foreground mt-0.5">4.2h today</p>
+                <p className="text-sm font-medium">Level {stats.level} · {stats.streak} day streak</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{completedToday.length} task{completedToday.length === 1 ? "" : "s"} done today</p>
               </div>
             </div>
 
             <WeekAhead days={workloadByDay} />
 
             {topInsight && (
-              <div className="w-full flex items-center gap-2 p-3 rounded-xl bg-card border border-border hover:border-primary/40 transition-all group">
+              <div className="w-full flex items-start gap-2 p-3 rounded-xl bg-card border border-border hover:border-primary/40 transition-all group">
                 <button
                   onClick={() => navigate("/ai")}
-                  className="flex-1 min-w-0 flex items-center gap-2 text-left"
+                  className="flex-1 min-w-0 flex items-start gap-2 text-left"
                 >
-                  <Lightbulb className="size-4 text-primary shrink-0" />
-                  <span className="text-xs flex-1 min-w-0 truncate">{topInsight.title} — {topInsight.body}</span>
+                  <Lightbulb className="size-4 text-primary shrink-0 mt-0.5" />
+                  <span className="text-xs flex-1 min-w-0">{topInsight.title} — {topInsight.body}</span>
                 </button>
                 <button
                   onClick={() => dismissInsight(topInsight.id)}
