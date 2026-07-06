@@ -4,9 +4,10 @@
 // nothing here is hardcoded, every selection updates the app's state.
 
 import { motion } from "motion/react";
-import { Palette, Moon, Volume2, Bell, Zap, Heart, Users, Sparkles, Check } from "lucide-react";
+import { Palette, Moon, Volume2, Bell, Zap, Heart, Users, Sparkles, Check, RotateCcw } from "lucide-react";
 import { useCustomization } from "./customization-context";
 import type { ThemeId, EnvironmentId, StudyMode } from "./customization-context";
+import { useLocalData } from "./local-data-context";
 
 // ── Static Data ────────────────────────────────────────────────────────────
 // These arrays define what gets rendered in each section.
@@ -77,6 +78,14 @@ export function CustomizationPage() {
     resetToDefault,
     hasUnsavedChanges,
   } = useCustomization();
+  const { resetProgress } = useLocalData();
+
+  const handleResetProgress = () => {
+    const confirmed = window.confirm(
+      "Reset all progress? This clears your level, XP, streak, unlocked badges, and every task - like a brand-new account. This can't be undone."
+    );
+    if (confirmed) resetProgress();
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
@@ -321,6 +330,31 @@ export function CustomizationPage() {
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* ── Danger Zone ──────────────────────────────────────────────────
+            Wipes level/XP/streak, badges, and the task list back to a
+            brand-new-install state. Separate from "Reset to Default" above,
+            which only touches theme/mode/preferences.                        */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.75 }}
+          className="p-6 rounded-xl bg-destructive/5 border border-destructive/20 flex items-center justify-between gap-4"
+        >
+          <div>
+            <h4 className="font-medium">Reset Progress</h4>
+            <p className="text-sm text-muted-foreground">
+              Clears your level, XP, streak, badges, and all tasks - starts you fresh like a new user.
+            </p>
+          </div>
+          <button
+            onClick={handleResetProgress}
+            className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-destructive/40 text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <RotateCcw className="size-4" />
+            Reset Progress
+          </button>
         </motion.div>
 
         {/* ── Save / Reset ──────────────────────────────────────────────────
