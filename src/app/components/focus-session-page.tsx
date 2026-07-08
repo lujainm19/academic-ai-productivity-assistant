@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { useAIEngine, productivityPatterns } from "./ai-engine-context";
 import { useCustomization } from "./customization-context";
 
+
 const environments = [
   { id: "cafe", name: "Rainy Café", image: "https://images.unsplash.com/photo-1739918069081-78dddf3240a6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920" },
   { id: "academia", name: "Dark Academia", image: "https://images.unsplash.com/photo-1530984794059-26f732e6b7ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920" },
@@ -57,12 +58,64 @@ export function FocusSessionPage() {
   // Read focus and break duration from saved user preferences
   const savedFocusMins = parseInt(savedSettings.focusDuration);
   const savedBreakMins = parseInt(savedSettings.breakDuration);
-  const focusDuration = (useAdaptedDuration ? adaptedPomoDuration : savedFocusMins) * 60;
-  const breakDuration = (sessionCount >= 3 ? 20 : savedBreakMins) * 60;
+  // Local break duration and reminders — controlled from the settings panel
+  const [customBreakDuration, setCustomBreakDuration] = useState(5);
+  const [localBreakReminders, setLocalBreakReminders] = useState(true);
+  // Use customDuration from the settings panel input, not saved preferences
+  const focusDuration = (useAdaptedDuration ? adaptedPomoDuration : customDuration) * 60;
+  const breakDuration = (sessionCount >= 3 ? 20 : customBreakDuration) * 60;
+  // Randomly picked break message — set when break starts, stays until next break
+  const [breakMessage, setBreakMessage] = useState("");
+
+ // Alarm sound that loops until the user dismisses it
+  const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [alarmRinging, setAlarmRinging] = useState(false);
+
+const startAlarm = () => {
+  setAlarmRinging(true);
+  // Create one AudioContext and reuse it for the repeating beep
+  const ctx = new AudioContext();
+  
+  const playBeep = () => {
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(1000, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
+  };
+
+  playBeep();
+  alarmIntervalRef.current = setInterval(playBeep, 1000);
+
+  // Store ctx so we can close it when stopping
+  (alarmIntervalRef as any).ctx = ctx;
+
+  // Auto stop after 10 seconds
+  setTimeout(() => stopAlarm(), 10000);
+};
+
+const stopAlarm = () => {
+  if (alarmIntervalRef.current) {
+    clearInterval(alarmIntervalRef.current);
+    // Close the AudioContext to fully stop all sound
+    if ((alarmIntervalRef as any).ctx) {
+      (alarmIntervalRef as any).ctx.close();
+      (alarmIntervalRef as any).ctx = null;
+    }
+    alarmIntervalRef.current = null;
+  }
+  setAlarmRinging(false);
+};
 
   useEffect(() => {
-    setTimeLeft(focusDuration);
-  }, [useAdaptedDuration, customDuration, adaptedPomoDuration]);
+  setTimeLeft(focusDuration);
+}, [useAdaptedDuration, customDuration, adaptedPomoDuration, focusDuration]);
 
   useEffect(() => {
     // Show burnout warning if risk is high and 3+ sessions done
@@ -75,7 +128,7 @@ export function FocusSessionPage() {
   // Break reminder — fires 5 mins before break and when break starts
 // Only runs if user has break reminders enabled in preferences
 useEffect(() => {
-  if (!savedSettings.breakReminders) return;
+  if (!localBreakReminders) return;
 
   // 5 minutes warning before focus ends
   if (mode === "focus" && isRunning && timeLeft === 5 * 60) {
@@ -95,11 +148,23 @@ useEffect(() => {
     if (isRunning && timeLeft > 0) {
       interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
     } else if (timeLeft === 0) {
+      startAlarm();
       if (mode === "focus") {
         setSessionCount(c => c + 1);
         setSessionLog(log => [...log, { taskTitle: selectedTask.title, durationMin: useAdaptedDuration ? adaptedPomoDuration : customDuration, completedAt: new Date() }]);
         setMode("break");
         setTimeLeft(breakDuration);
+        // Pick a random break message when break starts
+        const messages = [
+          "🍫 Go treat yourself to some chocolate, you earned it!",
+          "📱 Doomscroll guilt-free for 5 minutes, we won't judge.",
+          "🚶 Take a little walk, even just to the kitchen and back.",
+          "💧 Hydrate! Your brain is basically a wrinkly water balloon.",
+          "🐱 Go pet an animal if one is nearby. Mandatory.",
+          "🪟 Stare out a window and think about absolutely nothing.",
+          "🧃 Snack time. You studied hard, you deserve it.",
+        ];
+        setBreakMessage(messages[Math.floor(Math.random() * messages.length)]);
       } else {
         setMode("focus");
         setTimeLeft(focusDuration);
@@ -116,8 +181,23 @@ useEffect(() => {
 
   const toggleTimer = () => setIsRunning(!isRunning);
   const skipSession = () => {
-    if (mode === "focus") { setMode("break"); setTimeLeft(breakDuration); }
-    else { setMode("focus"); setTimeLeft(focusDuration); }
+    if (mode === "focus") {
+      setMode("break");
+      setTimeLeft(breakDuration);
+      const messages = [
+        "🍫 Go treat yourself to some chocolate, you earned it!",
+        "📱 Doomscroll guilt-free for 5 minutes, we won't judge.",
+        "🚶 Take a little walk, even just to the kitchen and back.",
+        "💧 Hydrate! Your brain is basically a wrinkly water balloon.",
+        "🐱 Go pet an animal if one is nearby. Mandatory.",
+        "🪟 Stare out a window and think about absolutely nothing.",
+        "🧃 Snack time. You studied hard, you deserve it.",
+      ];
+      setBreakMessage(messages[Math.floor(Math.random() * messages.length)]);
+    } else {
+      setMode("focus");
+      setTimeLeft(focusDuration);
+    }
     setIsRunning(false);
   };
 
@@ -201,17 +281,7 @@ useEffect(() => {
               className="mx-6 mb-2 p-3 rounded-xl bg-green-500/20 backdrop-blur-sm border border-green-500/30 flex items-center gap-2"
             >
               <Activity className="size-4 text-green-400 shrink-0" />
-              <p className="text-xs text-green-200 flex-1">
-                {[
-                  "🍫 Go treat yourself to some chocolate, you earned it!",
-                  "📱 Doomscroll guilt-free for 5 minutes, we won't judge.",
-                  "🚶 Take a little walk, even just to the kitchen and back.",
-                  "💧 Hydrate! Your brain is basically a wrinkly water balloon.",
-                  "🐱 Go pet an animal if one is nearby. Mandatory.",
-                  "🪟 Stare out a window and think about absolutely nothing.",
-                  "🧃 Snack time. You studied hard, you deserve it.",
-                ][Math.floor(Math.random() * 7)]}
-              </p>
+              <p className="text-xs text-green-200 flex-1">{breakMessage}</p>
               <button onClick={() => setShowBreakStarted(false)} className="text-xs text-green-400 shrink-0">OK</button>
             </motion.div>
           )}
@@ -315,14 +385,88 @@ useEffect(() => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="absolute top-20 right-6 p-6 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/20 shadow-2xl max-w-sm w-full z-30"
+              className="absolute top-20 right-6 p-6 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/20 shadow-2xl max-w-sm w-full z-30 max-h-[80vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-white">Environment</h3>
+                <h3 className="font-semibold text-white">Session Settings</h3>
                 <button onClick={() => setShowSettings(false)}>
                   <X className="size-5 text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
+
+              {/* ── Timer Settings ───────────────────────────────────────────
+                  Free-form inputs so the user can set any duration they want.
+                  Break reminders toggle lives here too since it's session-related. */}
+              <div className="mb-4 p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                <h4 className="text-sm font-medium text-white">Timer</h4>
+
+                {/* Focus duration — free form input like a phone timer */}
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs text-white/60">Focus Duration</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={customDuration}
+                      onChange={e => {
+                        const val = Math.max(5, Math.min(120, parseInt(e.target.value) || 25));
+                        setCustomDuration(val);
+                        setUseAdaptedDuration(false);
+                        setTimeLeft(val * 60);
+                      }}
+                      className="w-16 px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white text-center text-sm outline-none focus:border-primary"
+                    />
+                    <span className="text-xs text-white/60">mins</span>
+                  </div>
+                </div>
+
+                {/* Break duration — free form too */}
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs text-white/60">Break Duration</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={customBreakDuration}
+                      onChange={e => {
+                        const val = Math.max(1, Math.min(30, parseInt(e.target.value) || 5));
+                        setCustomBreakDuration(val);
+                      }}
+                      className="w-16 px-2 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white text-center text-sm outline-none focus:border-primary"
+                    />
+                    <span className="text-xs text-white/60">mins</span>
+                  </div>
+                </div>
+
+                {/* AI suggestion */}
+                <button
+                  onClick={() => { setUseAdaptedDuration(true); setCustomDuration(adaptedPomoDuration); setTimeLeft(adaptedPomoDuration * 60); }}
+                  className="w-full text-xs text-primary/80 hover:text-primary transition-colors text-left"
+                >
+                  ✨ Use AI suggestion ({adaptedPomoDuration} mins)
+                </button>
+
+                {/* Break reminders toggle */}
+                <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <div>
+                    <p className="text-xs text-white font-medium">Break Reminders</p>
+                    <p className="text-xs text-white/50">5 min warning before break</p>
+                  </div>
+                  <button
+                    onClick={() => setLocalBreakReminders(prev => !prev)}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${
+                      localBreakReminders ? "bg-primary" : "bg-white/20"
+                    }`}
+                  >
+                    <span className={`absolute top-1 size-4 rounded-full bg-white transition-all ${
+                      localBreakReminders ? "left-6" : "left-1"
+                    }`} />
+                  </button>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-3">
                 {environments.map(env => (
                   <button
@@ -363,6 +507,20 @@ useEffect(() => {
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="text-center space-y-10 max-w-2xl w-full">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
+              {/* Alarm dismiss button — shows when timer ends */}
+              <AnimatePresence>
+                {alarmRinging && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={stopAlarm}
+                    className="mb-4 px-6 py-3 rounded-full bg-red-500 text-white font-semibold text-sm animate-pulse hover:bg-red-600 transition-all shadow-lg shadow-red-500/40"
+                  >
+                    🔔 Tap to stop alarm
+                  </motion.button>
+                )}
+              </AnimatePresence>
               <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-card/30 backdrop-blur-sm border border-border/50 mb-6">
                 <div className={`size-2 rounded-full ${isRunning ? "bg-green-500 animate-pulse" : "bg-muted-foreground"}`} />
                 <span className="text-sm font-medium">{mode === "focus" ? "Focus Session" : sessionCount >= 3 ? "Long Break" : "Short Break"}</span>
@@ -433,25 +591,6 @@ useEffect(() => {
                 <Brain className="size-6 text-white" />
               </button>
             </motion.div>
-
-            {/* Break message */}
-            <AnimatePresence>
-              {mode === "break" && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="p-4 rounded-xl bg-accent/10 border border-accent/20"
-                >
-                  <p className="text-sm text-muted-foreground">
-                    {sessionCount >= 4
-                      ? "Outstanding! You've completed 4 focus sessions. AI recommends a 20-minute restorative break — stretch, hydrate, and step outside if possible."
-                      : "Great work! Take a moment to stretch, hydrate, and rest your eyes. AI will notify you when it's time to refocus."
-                    }
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
 

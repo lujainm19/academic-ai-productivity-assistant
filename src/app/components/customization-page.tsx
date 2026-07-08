@@ -4,7 +4,7 @@
 // nothing here is hardcoded, every selection updates the app's state.
 
 import { motion } from "motion/react";
-import { Palette, Moon, Bell, Zap, Heart, Users, Sparkles, Check } from "lucide-react";
+import { Palette, Moon, Zap, Heart, Users, Sparkles, Check } from "lucide-react";
 import { useCustomization } from "./customization-context";
 import type { ThemeId, EnvironmentId, StudyMode } from "./customization-context";
 
@@ -68,10 +68,6 @@ export function CustomizationPage() {
     setStudyMode,
     setTheme,
     setEnvironment,
-    setBreakReminders,
-    setFocusDuration,
-    setBreakDuration,
-    setDefaultEnvironment,
     saveChanges,
     resetToDefault,
     hasUnsavedChanges,
@@ -215,88 +211,6 @@ export function CustomizationPage() {
                 </motion.button>
               );
             })}
-          </div>
-        </motion.div>
-
-        {/* ── Preferences ──────────────────────────────────────────────────
-            Toggle switches for ambient sounds and break reminders.
-            Dropdowns for session duration defaults.
-            All values are controlled — they read from and write to context.   */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="space-y-4">
-          <h2 className="text-xl font-semibold">Preferences</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-
-            {/* Toggle switches */}
-            <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-
-              {/* Break Reminders toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Bell className="size-5 text-primary" />
-                  <div>
-                    <h4 className="font-medium">Break Reminders</h4>
-                    <p className="text-sm text-muted-foreground">Gentle notifications</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setBreakReminders(!settings.breakReminders)}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${
-                    settings.breakReminders ? "bg-primary" : "bg-secondary"
-                  }`}
-                >
-                  <span className={`absolute top-1 size-4 rounded-full bg-white transition-all ${
-                    settings.breakReminders ? "left-6" : "left-1"
-                  }`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Session duration dropdowns */}
-            <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-              <h4 className="font-medium">Focus Session Defaults</h4>
-
-              {/* Focus duration — controlled select reads from settings.focusDuration */}
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Focus Duration</label>
-                <select
-                  value={settings.focusDuration}
-                  onChange={e => setFocusDuration(e.target.value as any)}
-                  className="w-full px-4 py-2 rounded-lg bg-secondary border border-border focus:border-primary outline-none"
-                >
-                  <option value="15">15 minutes (Quick Sprint)</option>
-                  <option value="25">25 minutes (Classic Pomodoro)</option>
-                  <option value="50">50 minutes (Long Focus)</option>
-                </select>
-              </div>
-
-              {/* Break duration */}
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Break Duration</label>
-                <select
-                  value={settings.breakDuration}
-                  onChange={e => setBreakDuration(e.target.value as any)}
-                  className="w-full px-4 py-2 rounded-lg bg-secondary border border-border focus:border-primary outline-none"
-                >
-                  <option value="5">5 minutes</option>
-                  <option value="10">10 minutes</option>
-                  <option value="15">15 minutes</option>
-                </select>
-              </div>
-
-              {/* Default environment for focus sessions */}
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Default Environment</label>
-                <select
-                  value={settings.defaultEnvironment}
-                  onChange={e => setDefaultEnvironment(e.target.value as any)}
-                  className="w-full px-4 py-2 rounded-lg bg-secondary border border-border focus:border-primary outline-none"
-                >
-                  {environments.map(env => (
-                    <option key={env.id} value={env.id}>{env.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
         </motion.div>
 
