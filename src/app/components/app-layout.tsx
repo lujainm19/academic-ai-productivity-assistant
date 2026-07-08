@@ -3,7 +3,7 @@ import { LayoutDashboard, Target, Zap, Trophy, Settings, Brain } from "lucide-re
 import { motion } from "motion/react";
 import { useAIEngine } from "./ai-engine-context";
 import { AINotificationOverlay } from "./ai-notification-overlay";
-import { useCustomization } from "./customization-context";
+import { useLocalData } from "./local-data-context";
 
 const navItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -18,19 +18,16 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { insights, isAnalyzing } = useAIEngine();
+  const { stats } = useLocalData();
   const urgentCount = insights.filter(i => !i.dismissed && (i.priority === "urgent" || i.priority === "high")).length;
-  const { savedMode } = useCustomization();
+  const xpIntoLevel = stats.xp % 500;
 
   return (
-    <div className={`flex h-screen bg-background dark mode-${savedMode}`}>
+    <div className="flex h-screen bg-background dark">
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className={`w-20 lg:w-64 border-r border-border flex flex-col backdrop-blur-sm transition-all duration-500 ${
-          savedMode === "cozy"          ? "bg-card/30" :
-          savedMode === "competitive"   ? "bg-card/60 border-orange-500/20" :
-                                          "bg-card/40 border-indigo-500/20"
-        }`}
+        className="w-20 lg:w-64 border-r border-border flex flex-col bg-card/30 backdrop-blur-sm"
       >
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-3">
@@ -49,10 +46,7 @@ export function AppLayout() {
           <div className="flex items-center gap-2">
             <div className={`size-2 rounded-full ${isAnalyzing ? "bg-amber-500 animate-pulse" : "bg-green-500"}`} />
             <span className="text-xs text-muted-foreground">
-              {isAnalyzing ? "AI analyzing..." :
-                savedMode === "cozy"        ? "AI active · here when you need it 🌿" :
-                savedMode === "competitive" ? "AI active · pushing you forward ⚡" :
-                                              "AI active · synced with your team 👥"}
+              {isAnalyzing ? "AI analyzing..." : "AI active · monitoring"}
             </span>
           </div>
         </div>
@@ -76,7 +70,6 @@ export function AppLayout() {
               >
                 <item.icon className="size-5 shrink-0" />
                 <span className="hidden lg:block font-medium">{item.label}</span>
-                {/* Urgent badge on AI nav */}
                 {item.highlight && urgentCount > 0 && !isActive && (
                   <span className="hidden lg:flex ml-auto size-5 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center">
                     {urgentCount}
@@ -94,16 +87,16 @@ export function AppLayout() {
           <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 via-accent/10 to-primary/10 border border-primary/20">
             <div className="flex items-center gap-3 mb-3">
               <div className="size-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-                <span className="text-sm font-bold text-white">A</span>
+                <Brain className="size-5 text-white" />
               </div>
               <div className="hidden lg:block flex-1 min-w-0">
-                <h4 className="font-medium truncate">Alex</h4>
-                <p className="text-xs text-muted-foreground">Level 8 · 1,240 XP</p>
+                <h4 className="font-medium truncate">You</h4>
+                <p className="text-xs text-muted-foreground">Level {stats.level} · {stats.xp.toLocaleString()} XP</p>
               </div>
             </div>
             <div className="hidden lg:block">
               <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: "62%" }} />
+                <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: `${(xpIntoLevel / 500) * 100}%` }} />
               </div>
             </div>
           </div>
@@ -114,7 +107,6 @@ export function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Global AI Notification Overlay */}
       <AINotificationOverlay />
     </div>
   );
