@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { useAIEngine } from "./ai-engine-context";
 import { AINotificationOverlay } from "./ai-notification-overlay";
 import { useLocalData } from "./local-data-context";
+import { ProdigyMark } from "./prodigy-mark";
 
 const navItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -31,13 +32,10 @@ export function AppLayout() {
       >
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
-              <Brain className="size-6 text-white" />
-            </div>
-            <div className="hidden lg:block">
-              <h2 className="font-semibold">Adaptive</h2>
-              <p className="text-xs text-muted-foreground">Productivity</p>
-            </div>
+            <ProdigyMark size={30} className="shrink-0 text-foreground" />
+            <h2 className="hidden lg:block font-bold text-xl tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              prodigy
+            </h2>
           </div>
         </div>
 
