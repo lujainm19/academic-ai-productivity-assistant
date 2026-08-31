@@ -10,6 +10,8 @@ import { AppLayout } from "./components/app-layout";
 import { AIEngineProvider } from "./components/ai-engine-context";
 import { LocalDataProvider } from "./components/local-data-context";
 import { CustomizationProvider } from "./components/customization-context";
+import { FocusCanvasProvider } from "./components/focus-canvas-context";
+import { AppAuthProvider } from "./components/app-auth-context";
 
 export default function App() {
   return (
@@ -18,18 +20,22 @@ export default function App() {
         <LocalDataProvider>
           <CustomizationProvider>
             <AIEngineProvider>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/focus" element={<FocusSessionPage />} />
-                <Route element={<AppLayout />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/tasks" element={<TaskPlannerPage />} />
-                  <Route path="/ai" element={<AIPanelPage />} />
-                  <Route path="/progress" element={<ProgressPage />} />
-                  <Route path="/customize" element={<CustomizationPage />} />
-                </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <AppAuthProvider>
+                <FocusCanvasProvider>
+                  <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/focus" element={<FocusSessionPage />} />
+                    <Route element={<AppLayout />}>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/tasks" element={<TaskPlannerPage />} />
+                      <Route path="/ai" element={<AIPanelPage />} />
+                      <Route path="/progress" element={<ProgressPage />} />
+                      <Route path="/customize" element={<CustomizationPage />} />
+                    </Route>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </FocusCanvasProvider>
+              </AppAuthProvider>
             </AIEngineProvider>
           </CustomizationProvider>
         </LocalDataProvider>
