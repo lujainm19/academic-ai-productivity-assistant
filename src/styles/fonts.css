@@ -1,0 +1,7 @@
+/* Google Fonts — must load before Tailwind/theme in index.css so the
+   @import rule stays valid (CSS requires @import before other rules).
+   Previously lived in globals.css, which nothing actually imported, so
+   Inter/Space Grotesk/Plus Jakarta Sans were silently falling back to
+   system fonts everywhere. Fraunces is new: the Focus canvas's serif for
+   the timer and headings — warm and editorial, not a digital-clock face. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&display=swap');

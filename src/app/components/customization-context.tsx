@@ -181,21 +181,26 @@ function applyMode(mode: StudyMode) {
   }> = {
     cozy: {
       bg: "#13101a",
-      card: "rgba(236,72,153,0.06)",
+      // Cards must stay legibly opaque even when they float over the Focus
+      // page's photo backgrounds, not just the flat dark page background —
+      // a near-transparent card there means text sits directly on whatever
+      // the photo looks like at that pixel. Keep the mode's hue, but as a
+      // mostly-opaque dark tint rather than a barely-there wash.
+      card: "rgba(34,20,30,0.92)",
       border: "rgba(236,72,153,0.15)",
       font: "'Inter', sans-serif",
       radius: "1.5rem",
     },
     competitive: {
       bg: "#0a0a0a",
-      card: "rgba(249,115,22,0.08)",
+      card: "rgba(24,16,10,0.94)",
       border: "rgba(249,115,22,0.3)",
       font: "'Space Grotesk', sans-serif",
       radius: "0.25rem",
     },
     collaborative: {
       bg: "#0d1120",
-      card: "rgba(99,102,241,0.08)",
+      card: "rgba(15,17,30,0.92)",
       border: "rgba(99,102,241,0.2)",
       font: "'Plus Jakarta Sans', sans-serif",
       radius: "1rem",
