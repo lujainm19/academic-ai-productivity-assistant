@@ -175,7 +175,7 @@ export function LandingPage() {
 
         <Sticker style={{ top: 96, left: "12%", rotate: -10 as any }} parallax={parallax} depth={1.4}>
           <div className="w-32 rounded-xl p-2.5 shadow-lg" style={{ background: "#25301f" }}>
-            <p className="text-[10px] leading-snug" style={{ color: "#cfe0c0", fontFamily: "'Fraunces', serif" }}>bio final — chapter 9 tonight</p>
+            <p className="text-[10px] leading-snug" style={{ color: "#cfe0c0", fontFamily: "'Fraunces', serif" }}>bio final, chapter 9 tonight</p>
           </div>
         </Sticker>
 
@@ -236,7 +236,7 @@ export function LandingPage() {
             className="mt-5 text-lg max-w-lg mx-auto leading-relaxed"
             style={{ color: "rgba(26,26,26,0.62)" }}
           >
-            a timer that anchors it, widgets that make it yours, and the parts of studying you already use — Canvas, Spotify, your calendar — pulled into one quiet place.
+            a timer that anchors it, widgets that make it yours, and the parts of studying you already use (Canvas, Spotify, your calendar) pulled into one quiet place.
           </motion.p>
 
           <motion.div
@@ -317,7 +317,7 @@ export function LandingPage() {
         <FeatureSection
           eyebrow="the canvas"
           title="a space you actually arrange"
-          body="drag widgets wherever you want them. photos, notes, your streak, your next deadline — placed by you, not laid out in a grid someone else picked. pick a background that's actually yours: cream, black, or something in between."
+          body="drag widgets wherever you want them. photos, notes, your streak, your next deadline, placed by you, not laid out in a grid someone else picked. pick a background that's actually yours: cream, black, or something in between."
           window={
             <div className="p-8 flex items-center justify-center gap-4">
               <div className="w-24 rounded-lg p-2 rotate-[-6deg]" style={{ background: "#1e2c38" }}>
@@ -333,7 +333,7 @@ export function LandingPage() {
         <FeatureSection
           eyebrow="one account"
           title="the tools you already have"
-          body="canvas for what's due, spotify for what you're playing, google calendar for what's next — connected once, shown quietly inside the same space you're focusing in. never a shared login, always your own."
+          body="canvas for what's due, spotify for what you're playing, google calendar for what's next. connected once, shown quietly inside the same space you're focusing in. never a shared login, always your own."
           reverse
           window={
             <div className="p-6 flex flex-col gap-2.5">
@@ -356,13 +356,13 @@ export function LandingPage() {
         <FeatureSection
           eyebrow="the timer"
           title="it notices, quietly"
-          body="peak focus hours, how long a session actually holds your attention, when a break helps more than pushing through — the timer adapts instead of just counting down. no leaderboards, no streak guilt. just a little glow that grows when you show up."
+          body="peak focus hours, how long a session actually holds your attention, when a break helps more than pushing through. the timer adapts instead of just counting down. no leaderboards, no streak guilt. just a little glow that grows when you show up."
           window={
             <div className="p-8 flex items-center justify-center">
               <div className="rounded-xl px-4 py-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(239,106,74,0.25)" }}>
                 <Sparkles className="size-3.5" style={{ color: "#ef6a5a" }} />
                 <p className="text-[11.5px]" style={{ color: "rgba(255,255,255,0.7)" }}>
-                  peak focus window — session set to <span style={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}>32 min</span>
+                  peak focus window, session set to <span style={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}>32 min</span>
                 </p>
               </div>
             </div>
@@ -376,7 +376,7 @@ export function LandingPage() {
         <div className="relative max-w-2xl mx-auto px-6 text-center">
           <ProdigyMark size={40} className="mx-auto mb-6 opacity-90" />
           <p className="text-2xl md:text-3xl font-medium leading-snug" style={{ fontFamily: "'Fraunces', serif" }}>
-            most productivity tools are built to be impressive. we'd rather build one that's built to be <em>yours</em> —
+            most productivity tools are built to be impressive. we'd rather build one that's built to be <em>yours</em>,
             open enough to still be filling in, the way an actual prodigy always is.
           </p>
         </div>

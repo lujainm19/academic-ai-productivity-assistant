@@ -226,7 +226,7 @@ function generateTaskInsights(tasks: Task[]): AIInsight[] {
       type: "schedule", priority: "high", confidence: 92,
       title: dueToday.length === 1 ? "1 Task Due Today" : `${dueToday.length} Tasks Due Today`,
       body: dueToday.length === 1
-        ? `"${dueToday[0].title}" is due today — a good next task to start now.`
+        ? `"${dueToday[0].title}" is due today, a good next task to start now.`
         : `Including "${dueToday[0].title}" and ${dueToday.length - 1} more. Consider tackling these before anything else.`,
       timestamp: now, dismissed: false
     });
@@ -237,7 +237,7 @@ function generateTaskInsights(tasks: Task[]): AIInsight[] {
       id: "task-due-tomorrow",
       type: "schedule", priority: "medium", confidence: 85,
       title: dueTomorrow.length === 1 ? "1 Task Due Tomorrow" : `${dueTomorrow.length} Tasks Due Tomorrow`,
-      body: `"${dueTomorrow[0].title}"${dueTomorrow.length > 1 ? ` and ${dueTomorrow.length - 1} more` : ""} due tomorrow — worth planning time for today.`,
+      body: `"${dueTomorrow[0].title}"${dueTomorrow.length > 1 ? ` and ${dueTomorrow.length - 1} more` : ""} due tomorrow, worth planning time for today.`,
       timestamp: now, dismissed: false
     });
   }
@@ -318,7 +318,7 @@ function generateAgentLog() {
   return [
     { id: "log-1", timestamp: minutesAgo(32), action: "Canvas Sync", detail: "Pulled 8 assignments from 5 courses", impact: "Study plan updated with 3 new blocks" },
     { id: "log-2", timestamp: minutesAgo(31), action: "Schedule Optimization", detail: "Moved Bio reading from Wed → Mon (low performance pattern)", impact: "Projected focus score +12%" },
-    { id: "log-3", timestamp: minutesAgo(30.5), action: "Priority Reorder", detail: "Elevated COSC125 A3 to critical — due in 1 day", impact: "Added urgent insight card" },
+    { id: "log-3", timestamp: minutesAgo(30.5), action: "Priority Reorder", detail: "Elevated COSC125 A3 to critical, due in 1 day", impact: "Added urgent insight card" },
     { id: "log-4", timestamp: minutesAgo(30), action: "Burnout Detection", detail: "5-day rolling average: 130 min/day → moderate risk", impact: "Suggested session cap for today" },
     { id: "log-5", timestamp: minutesAgo(29.5), action: "Pomodoro Adaptation", detail: "Task type is deep work; extended session to 35 min", impact: "Estimated 18% better retention" },
     { id: "log-6", timestamp: hoursAgo(11.5), action: "Focus Pattern Update", detail: "Confirmed peak window 7–10 PM (92% focus score)", impact: "All deep tasks rescheduled to evenings" },

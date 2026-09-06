@@ -11,6 +11,7 @@
 // browser can't read; React only finds out the outcome, never the value.
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { ProdigyMark } from "./prodigy-mark";
 
 interface AppUser {
   email: string;
@@ -146,11 +147,12 @@ function AuthModal({
         className="w-full max-w-sm p-6 rounded-2xl bg-[#161420] border border-white/10 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
+        <ProdigyMark size={30} blink className="text-white mb-3" />
         <h3 className="text-lg font-medium text-white mb-1">
           {mode === "login" ? "Sign in" : "Create an account"}
         </h3>
         <p className="text-xs text-white/45 mb-5">
-          This only exists so your Spotify/Calendar connections are yours — nothing else in the app needs it.
+          This only exists so your Spotify and Calendar connections are yours. Nothing else in the app needs it.
         </p>
         <form
           onSubmit={e => { e.preventDefault(); onSubmit(email, password); }}

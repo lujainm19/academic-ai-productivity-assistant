@@ -1,84 +1,47 @@
 // customization-context.tsx
-// This file is the "backend" of our customization feature.
-// It manages all user preferences (study mode, theme, environment, etc.)
-// and makes them available to every page in the app via React Context.
+// Backend for the Settings page. Two things intentionally live here and
+// nowhere else:
+//   - the 6-hue accent "Color Theme" system (--primary/--accent), which
+//     Dashboard, Task Planner, AI Assistant, Progress, and the sidebar all
+//     still depend on — this hasn't been rebuilt onto prodigy's own
+//     cream/black system yet (that's the "align the other pages" work,
+//     still ahead), so it stays as the real, working theming layer for now.
+//   - Focus session defaults (duration, break reminders) — the Focus page
+//     genuinely reads these.
+//
+// Retired: the 3 "Study Mode" personality transforms (Cozy/Competitive/
+// Collaborative swapping fonts/corners/shadows app-wide via an injected
+// !important stylesheet) and the "Focus Environment" photo picker. Both
+// predate prodigy's own design language and were actively fighting it —
+// the mode system used the exact "force every card to near-transparent"
+// pattern that caused the original Focus-page contrast bug, and the
+// environment picker duplicated a decision the Focus Canvas now makes
+// better, in-context, on its own background picker.
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-// ── Type Definitions ───────────────────────────────────────────────────────
-// These define the valid values for each setting.
-// TypeScript will throw an error if we pass anything outside these options.
-
-export type StudyMode = "cozy" | "competitive" | "collaborative";
 export type ThemeId = "midnight" | "ocean" | "forest" | "sunset" | "rose" | "lavender";
-export type EnvironmentId = "cafe" | "academia" | "cyber" | "forest" | "space" | "minimal";
 export type FocusDuration = "15" | "25" | "50";
 export type BreakDuration = "5" | "10" | "15";
 
-// This interface defines the shape of ALL user settings combined
 export interface CustomizationSettings {
-  studyMode: StudyMode;
   themeId: ThemeId;
-  environmentId: EnvironmentId;
   breakReminders: boolean;
   focusDuration: FocusDuration;
   breakDuration: BreakDuration;
-  defaultEnvironment: EnvironmentId;
 }
 
-// ── Default Settings ───────────────────────────────────────────────────────
-// These are the values the app starts with on first load,
-// and what "Reset to Default" snaps back to.
-
 export const DEFAULT_SETTINGS: CustomizationSettings = {
-  studyMode: "cozy",           // start in cozy mode
-  themeId: "midnight",         // midnight blue color theme
-  environmentId: "cafe",       // rainy café as the focus background
-  breakReminders: true,        // break reminders on by default
-  focusDuration: "25",         // classic 25-min pomodoro
-  breakDuration: "5",          // 5-min break
-  defaultEnvironment: "cafe",  // rainy café as default session environment
-};
-
-// ── Mode CSS Variables ─────────────────────────────────────────────────────
-// Each study mode injects different CSS variables into the document root.
-// This is how the entire app's feel changes when the user switches modes
-// and hits Save Changes — border radius, font weight, shadows, spacing all shift.
-
-export const MODE_STYLES: Record<StudyMode, Record<string, string>> = {
-  cozy: {
-    // Soft, rounded, warm — feels like a comfortable study nook
-    "--mode-radius": "1.25rem",
-    "--mode-font-weight": "400",
-    "--mode-card-opacity": "0.85",
-    "--mode-border-style": "1px solid rgba(255,255,255,0.08)",
-    "--mode-shadow": "0 4px 24px rgba(0,0,0,0.18)",
-    "--mode-spacing": "1.5rem",
-  },
-  competitive: {
-    // Sharp, bold, high-contrast — feels intense and driven
-    "--mode-radius": "0.5rem",
-    "--mode-font-weight": "600",
-    "--mode-card-opacity": "1",
-    "--mode-border-style": "1px solid rgba(255,255,255,0.15)",
-    "--mode-shadow": "0 0 32px rgba(249,115,22,0.15)",
-    "--mode-spacing": "1rem",
-  },
-  collaborative: {
-    // Balanced, friendly, open — feels like a group workspace
-    "--mode-radius": "1rem",
-    "--mode-font-weight": "500",
-    "--mode-card-opacity": "0.92",
-    "--mode-border-style": "1px solid rgba(99,102,241,0.2)",
-    "--mode-shadow": "0 4px 20px rgba(99,102,241,0.12)",
-    "--mode-spacing": "1.25rem",
-  },
+  themeId: "midnight",
+  breakReminders: true,
+  focusDuration: "25",
+  breakDuration: "5",
 };
 
 // ── Theme Color Maps ───────────────────────────────────────────────────────
-// Maps each theme ID to its primary and accent hex colors.
-// These get written directly to CSS variables on the document root,
-// so every component that uses --primary or --accent updates instantly.
+// Maps each theme ID to its primary and accent hex colors, written to CSS
+// variables on :root — every component using --primary/--accent updates
+// instantly.
 
 export const THEME_VARS: Record<ThemeId, { primary: string; accent: string }> = {
   midnight:  { primary: "#6366f1", accent: "#8b5cf6" },
@@ -89,35 +52,21 @@ export const THEME_VARS: Record<ThemeId, { primary: string; accent: string }> = 
   lavender:  { primary: "#a855f7", accent: "#d946ef" },
 };
 
-// ── Context Interface ──────────────────────────────────────────────────────
-// This defines everything the context exposes to the rest of the app —
-// the current settings, all the setter functions, and save/reset actions.
-
 interface CustomizationContextValue {
-  settings: CustomizationSettings;       // the current draft (unsaved changes included)
-  savedMode: StudyMode;                  // the last saved mode (used by other pages)
+  settings: CustomizationSettings;    // current draft (unsaved changes included)
   savedSettings: CustomizationSettings;
-  setStudyMode: (mode: StudyMode) => void;
   setTheme: (id: ThemeId) => void;
-  setEnvironment: (id: EnvironmentId) => void;
   setBreakReminders: (v: boolean) => void;
   setFocusDuration: (v: FocusDuration) => void;
   setBreakDuration: (v: BreakDuration) => void;
-  setDefaultEnvironment: (v: EnvironmentId) => void;
   saveChanges: () => void;
   resetToDefault: () => void;
-  hasUnsavedChanges: boolean;            // true when draft differs from saved
+  hasUnsavedChanges: boolean;
 }
 
-// Create the context with null as the initial value.
-// The useCustomization hook below will throw a helpful error
-// if someone tries to use it outside the provider.
 const CustomizationContext = createContext<CustomizationContextValue | null>(null);
 
-// ── Helper: Apply Theme to DOM ─────────────────────────────────────────────
-// Writes the selected theme's colors directly to CSS variables on :root.
-// Because all our components use var(--primary) and var(--accent),
-// this one function updates colors across the entire app instantly.
+const STORAGE_KEY = "adaptive:customization";
 
 function applyTheme(themeId: ThemeId) {
   const vars = THEME_VARS[themeId];
@@ -125,264 +74,81 @@ function applyTheme(themeId: ThemeId) {
   document.documentElement.style.setProperty("--accent", vars.accent);
   document.documentElement.style.setProperty("--ring", vars.primary);
 
-  // Inject style tag to override Tailwind's color classes
   const existing = document.getElementById("theme-style-override");
   if (existing) existing.remove();
   const styleTag = document.createElement("style");
   styleTag.id = "theme-style-override";
   styleTag.innerHTML = `
-    /* Primary colored backgrounds — keep text white */
-    .bg-primary { 
-      background-color: ${vars.primary} !important; 
-      color: #ffffff !important;
-    }
+    .bg-primary { background-color: ${vars.primary} !important; color: #ffffff !important; }
     .bg-primary * { color: #ffffff !important; }
-
-    /* Text that should use primary color */
     .text-primary { color: ${vars.primary} !important; }
     .text-accent { color: ${vars.accent} !important; }
-
-    /* Borders */
-    .border-primary\\/50, .border-primary\\/30, .border-primary\\/20 { 
-      border-color: ${vars.primary}50 !important; 
+    .border-primary\\/50, .border-primary\\/30, .border-primary\\/20 {
+      border-color: ${vars.primary}50 !important;
     }
-
-    /* Gradient progress bars and XP bars only — not nav buttons */
-    .h-full.bg-gradient-to-r { 
-      background-image: linear-gradient(to right, ${vars.primary}, ${vars.accent}) !important; 
+    .h-full.bg-gradient-to-r {
+      background-image: linear-gradient(to right, ${vars.primary}, ${vars.accent}) !important;
     }
-    
-    /* Primary/accent icon colors */
     .text-primary svg, svg.text-primary { color: ${vars.primary} !important; }
-
-    /* Ring color */
     .ring-primary { --tw-ring-color: ${vars.primary} !important; }
-
-    /* Accent color */
     .accent-primary { accent-color: ${vars.primary} !important; }
   `;
   document.head.appendChild(styleTag);
 }
 
-// ── Helper: Apply Mode to DOM ──────────────────────────────────────────────
-// Writes all the mode-specific CSS variables to :root.
-// This only runs when the user clicks Save Changes,
-// so the mode transformation is intentional not instant.
-
-function applyMode(mode: StudyMode) {
-  const styles = MODE_STYLES[mode];
-  Object.entries(styles).forEach(([key, value]) => {
-    document.documentElement.style.setProperty(key, value);
-  });
-
-  // Dramatically change background and card colors per mode
-  const modeColors: Record<StudyMode, {
-    bg: string; card: string; border: string; font: string; radius: string;
-  }> = {
-    cozy: {
-      bg: "#13101a",
-      // Cards must stay legibly opaque even when they float over the Focus
-      // page's photo backgrounds, not just the flat dark page background —
-      // a near-transparent card there means text sits directly on whatever
-      // the photo looks like at that pixel. Keep the mode's hue, but as a
-      // mostly-opaque dark tint rather than a barely-there wash.
-      card: "rgba(34,20,30,0.92)",
-      border: "rgba(236,72,153,0.15)",
-      font: "'Inter', sans-serif",
-      radius: "1.5rem",
-    },
-    competitive: {
-      bg: "#0a0a0a",
-      card: "rgba(24,16,10,0.94)",
-      border: "rgba(249,115,22,0.3)",
-      font: "'Space Grotesk', sans-serif",
-      radius: "0.25rem",
-    },
-    collaborative: {
-      bg: "#0d1120",
-      card: "rgba(15,17,30,0.92)",
-      border: "rgba(99,102,241,0.2)",
-      font: "'Plus Jakarta Sans', sans-serif",
-      radius: "1rem",
-    },
-  };
-
-  const c = modeColors[mode];
-  // Set directly on body and root so Tailwind can't override
-  document.body.style.backgroundColor = c.bg;
-  document.body.style.fontFamily = c.font;
-  document.documentElement.style.setProperty("--background", c.bg);
-  document.documentElement.style.setProperty("--card", c.card);
-  document.documentElement.style.setProperty("--border", c.border);
-  document.documentElement.style.setProperty("--radius", c.radius);
-  
-  // Force card colors via a style tag so they override Tailwind
-  const existing = document.getElementById("mode-style-override");
-  if (existing) existing.remove();
-  const styleTag = document.createElement("style");
-  styleTag.id = "mode-style-override";
-  styleTag.innerHTML = `
-    .bg-card, [class*="bg-card"] { background-color: ${c.card} !important; }
-    .border-border, [class*="border-border"] { border-color: ${c.border} !important; }
-    .bg-background { background-color: ${c.bg} !important; }
-    
-    /* Mode: ${mode} — card glow effect */
-    .rounded-xl, .rounded-2xl {
-      box-shadow: ${
-        mode === "competitive"   ? "0 0 20px rgba(249,115,22,0.15), inset 0 1px 0 rgba(249,115,22,0.1)" :
-        mode === "cozy"          ? "0 4px 24px rgba(236,72,153,0.08), inset 0 1px 0 rgba(255,255,255,0.05)" :
-                                   "0 4px 20px rgba(99,102,241,0.1), inset 0 1px 0 rgba(99,102,241,0.08)"
-      } !important;
-    }
-
-    /* Sidebar glow strip */
-    aside {
-      border-right: 1px solid ${c.border} !important;
-      box-shadow: ${
-        mode === "competitive"   ? "4px 0 24px rgba(249,115,22,0.1)" :
-        mode === "cozy"          ? "4px 0 24px rgba(236,72,153,0.06)" :
-                                   "4px 0 24px rgba(99,102,241,0.08)"
-      } !important;
-    }
-
-    /* Button glow on hover */
-    button:hover {
-      box-shadow: ${
-        mode === "competitive"   ? "0 0 12px rgba(249,115,22,0.3)" :
-        mode === "cozy"          ? "0 0 12px rgba(236,72,153,0.2)" :
-                                   "0 0 12px rgba(99,102,241,0.2)"
-      } !important;
-    }
-      /* Heading transformations per mode */
-    h1, h2, h3 {
-      font-family: ${
-        mode === "competitive"   ? "'Space Grotesk', sans-serif" :
-        mode === "cozy"          ? "'Inter', sans-serif" :
-                                   "'Plus Jakarta Sans', sans-serif"
-      } !important;
-      text-transform: ${mode === "competitive" ? "uppercase" : "none"} !important;
-      letter-spacing: ${
-        mode === "competitive"   ? "0.08em" :
-        mode === "cozy"          ? "-0.01em" :
-                                   "0.02em"
-      } !important;
-      font-weight: ${
-        mode === "competitive"   ? "800" :
-        mode === "cozy"          ? "300" :
-                                   "600"
-      } !important;
-    }
-
-    /* Body text per mode */
-    p, span, label, button {
-      font-family: ${
-        mode === "competitive"   ? "'Space Grotesk', sans-serif" :
-        mode === "cozy"          ? "'Inter', sans-serif" :
-                                   "'Plus Jakarta Sans', sans-serif"
-      } !important;
-      font-weight: ${
-        mode === "competitive"   ? "600" :
-        mode === "cozy"          ? "300" :
-                                   "400"
-      } !important;
-      letter-spacing: ${
-        mode === "competitive"   ? "0.03em" :
-        mode === "cozy"          ? "0.01em" :
-                                   "0.01em"
-      } !important;
-    }
-  `;
-  document.head.appendChild(styleTag);
+// Loading defaults for any legacy keys (studyMode, environmentId, etc.)
+// that might still be sitting in a returning user's localStorage from
+// before this cleanup — spreading them into CustomizationSettings would
+// silently carry dead fields forward, so only the fields this type still
+// defines are read out.
+function loadSaved(): CustomizationSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return {
+      themeId: parsed.themeId ?? DEFAULT_SETTINGS.themeId,
+      breakReminders: parsed.breakReminders ?? DEFAULT_SETTINGS.breakReminders,
+      focusDuration: parsed.focusDuration ?? DEFAULT_SETTINGS.focusDuration,
+      breakDuration: parsed.breakDuration ?? DEFAULT_SETTINGS.breakDuration,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 }
 
-// ── Provider Component ─────────────────────────────────────────────────────
-// Wraps the entire app (via App.tsx) so every page can access settings.
-// Uses two separate state objects:
-//   - saved: what's committed to localStorage
-//   - draft: what the user is currently editing on the customization page
-
 export function CustomizationProvider({ children }: { children: ReactNode }) {
-
-  // On first load, try to restore settings from localStorage.
-  // If nothing is saved yet, fall back to DEFAULT_SETTINGS.
-  const [saved, setSaved] = useState<CustomizationSettings>(() => {
-    try {
-      const raw = localStorage.getItem("adaptive:customization");
-      return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
-
-  // Draft is what the user sees while editing — starts equal to saved.
-  // Changes here don't affect the rest of the app until Save is clicked.
+  const [saved, setSaved] = useState<CustomizationSettings>(loadSaved);
   const [draft, setDraft] = useState<CustomizationSettings>(saved);
-
-  // True when the user has made changes that haven't been saved yet.
-  // Used to enable/disable the Save Changes button and show the warning.
   const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(saved);
 
-  // On first mount, apply the saved theme and mode to the DOM
-  // so the app looks correct immediately after a page refresh.
   useEffect(() => {
     applyTheme(saved.themeId);
-    applyMode(saved.studyMode);
   }, []);
 
-  // Live-preview the theme color as the user clicks different themes.
-  // Note: mode does NOT live-preview — it only applies on Save.
-  
- // Apply saved theme on first load only
-useEffect(() => {
-  applyTheme(saved.themeId);
-  applyMode(saved.studyMode);
-}, []);
-
-  // ── Setters ──────────────────────────────────────────────────────────────
-  // Each setter updates only the draft, not the saved state.
-  // Nothing persists until saveChanges() is called.
-
-  const setStudyMode          = (v: StudyMode)       => setDraft(d => ({ ...d, studyMode: v }));
-  const setTheme              = (v: ThemeId)          => setDraft(d => ({ ...d, themeId: v }));
-  const setEnvironment        = (v: EnvironmentId)    => setDraft(d => ({ ...d, environmentId: v }));
-  const setBreakReminders     = (v: boolean)          => setDraft(d => ({ ...d, breakReminders: v }));
-  const setFocusDuration      = (v: FocusDuration)    => setDraft(d => ({ ...d, focusDuration: v }));
-  const setBreakDuration      = (v: BreakDuration)    => setDraft(d => ({ ...d, breakDuration: v }));
-  const setDefaultEnvironment = (v: EnvironmentId)    => setDraft(d => ({ ...d, defaultEnvironment: v }));
-
-  // ── Save Changes ──────────────────────────────────────────────────────────
-  // Commits the draft to saved state and persists it to localStorage.
-  // Also applies the selected mode to the DOM — this is the moment
-  // the rest of the app visually transforms.
+  const setTheme = (v: ThemeId) => setDraft(d => ({ ...d, themeId: v }));
+  const setBreakReminders = (v: boolean) => setDraft(d => ({ ...d, breakReminders: v }));
+  const setFocusDuration = (v: FocusDuration) => setDraft(d => ({ ...d, focusDuration: v }));
+  const setBreakDuration = (v: BreakDuration) => setDraft(d => ({ ...d, breakDuration: v }));
 
   const saveChanges = () => {
-  setSaved(draft);
-  localStorage.setItem("adaptive:customization", JSON.stringify(draft));
-  applyMode(draft.studyMode);
-  applyTheme(draft.themeId); // apply theme on save only
-};
-
-  // ── Reset to Default ──────────────────────────────────────────────────────
-  // Wipes both draft and saved back to DEFAULT_SETTINGS,
-  // updates localStorage, and immediately re-applies the default
-  // theme and mode to the DOM.
+    setSaved(draft);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    applyTheme(draft.themeId);
+  };
 
   const resetToDefault = () => {
     setDraft(DEFAULT_SETTINGS);
     setSaved(DEFAULT_SETTINGS);
-    localStorage.setItem("adaptive:customization", JSON.stringify(DEFAULT_SETTINGS));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
     applyTheme(DEFAULT_SETTINGS.themeId);
-    applyMode(DEFAULT_SETTINGS.studyMode);
   };
 
   return (
     <CustomizationContext.Provider value={{
       settings: draft,
-      savedMode: saved.studyMode,
       savedSettings: saved,
-      setStudyMode, setTheme, setEnvironment,
-      setBreakReminders,
-      setFocusDuration, setBreakDuration, setDefaultEnvironment,
+      setTheme, setBreakReminders, setFocusDuration, setBreakDuration,
       saveChanges, resetToDefault,
       hasUnsavedChanges,
     }}>
@@ -390,10 +156,6 @@ useEffect(() => {
     </CustomizationContext.Provider>
   );
 }
-
-// ── useCustomization Hook ─────────────────────────────────────────────────
-// This is what every other page imports to read or update settings.
-// Example usage: const { settings, saveChanges } = useCustomization();
 
 export function useCustomization() {
   const ctx = useContext(CustomizationContext);

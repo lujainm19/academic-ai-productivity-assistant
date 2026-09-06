@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { Trophy, Flame, Zap, Star, Award, TrendingUp, Calendar, Target, Brain, Clock } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
-import { useCustomization } from "./customization-context";
+import { ProdigyMark } from "./prodigy-mark";
 
 const weeklyData = [
   { day: "Mon", hours: 3.5, tasks: 4 },
@@ -34,7 +34,6 @@ export function ProgressPage() {
   const currentXP = 1240;
   const nextLevelXP = 2000;
   const xpProgress = (currentXP / nextLevelXP) * 100;
-  const { savedMode } = useCustomization();
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
@@ -44,11 +43,7 @@ export function ProgressPage() {
           animate={{ opacity: 1, y: 0 }}
         >
           <h1 className="text-4xl font-bold mb-2">Your Progress</h1>
-          <p className="text-muted-foreground">
-            {savedMode === "cozy"        ? "Every step forward counts 🌿 Be proud of how far you've come." :
-            savedMode === "competitive" ? "Dominate your goals ⚡ Push harder, level up faster." :
-                                           "Your team is watching 👥 Lead by example this week."}
-          </p>
+          <p className="text-muted-foreground">every step forward counts. be proud of how far you've come!</p>
         </motion.div>
 
         <motion.div
@@ -60,14 +55,10 @@ export function ProgressPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-3xl font-bold mb-1">Level {currentLevel}</h2>
-              <p className="text-muted-foreground">
-                {savedMode === "cozy"        ? "Gentle Scholar 🌿" :
-                savedMode === "competitive" ? "Grind Mode ⚡" :
-                                               "Team Player 👥"}
-</p>
+              <p className="text-muted-foreground">steady progress</p>
             </div>
             <div className="size-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
-              <Trophy className="size-10 text-white" />
+              <ProdigyMark size={44} mood="happy" blink className="text-white" />
             </div>
           </div>
           <div className="space-y-2">

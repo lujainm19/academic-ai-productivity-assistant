@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Plus, Calendar, Clock, Zap, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Link2, Flame, ListTodo, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useAIEngine, canvasCourses } from "./ai-engine-context";
-import { useCustomization } from "./customization-context";
+import { ProdigyMark } from "./prodigy-mark";
 
 type Status = "todo" | "in-progress" | "done";
 
@@ -33,7 +33,6 @@ const columns: { id: Status; label: string; icon: typeof ListTodo; accent: strin
 ];
 
 export function TaskPlannerPage() {
-  const { savedMode } = useCustomization();
   const { insights, isAnalyzing } = useAIEngine();
   const [tasks, setTasks] = useState<PlannerTask[]>(initialTasks);
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
@@ -84,11 +83,7 @@ export function TaskPlannerPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-2">Task Planner</h1>
-            <p className="text-muted-foreground">
-              {savedMode === "cozy"        ? "Take it one task at a time 🌿 No rush, just progress." :
-              savedMode === "competitive" ? "Ranked by urgency ⚡ Attack the hardest tasks first." :
-                                             "Synced with your team 👥 Stay on track together."}
-            </p>
+            <p className="text-muted-foreground">ranked by urgency. tackle the hardest tasks first!</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -135,7 +130,7 @@ export function TaskPlannerPage() {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <Brain className="size-4 text-primary" />
+                    <ProdigyMark size={16} className="text-primary" />
                     <span className="text-sm font-semibold">AI Recommendation</span>
                     <span className="text-xs text-muted-foreground">· {aiInsight.confidence}% confidence</span>
                   </div>

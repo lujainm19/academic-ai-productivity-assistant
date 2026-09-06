@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
-import { Brain, Send, User, Sparkles, Calendar, Target, TrendingUp, Zap } from "lucide-react";
+import { Send, User, Sparkles, Calendar, Target, TrendingUp, Zap } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { ProdigyMark } from "./prodigy-mark";
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -11,7 +12,7 @@ interface ChatMessage {
 const initialMessages: ChatMessage[] = [
   {
     role: "ai",
-    content: "Hey Alex! I've analyzed your schedule and found some important patterns.\n\nYou have **3 deadlines this week** — here's my recommended study plan:\n\n📌 Tonight 7–9 PM → COSC125 Assignment 3 (due tomorrow)\n📌 Friday 6–7 PM → Math Problem Set 8\n📌 Friday 8–9 PM → Bio Chapter 7 Notes\n📌 Sunday 7–9 PM → Physics Lab Report\n\nI moved Bio from Wednesday because your focus drops ~30% on that day. Want me to explain any of these choices?",
+    content: "Hey Alex! I looked at your schedule and found some good patterns.\n\nYou have **3 deadlines this week**, so here's my recommended study plan:\n\n📌 Tonight 7–9 PM → COSC125 Assignment 3 (due tomorrow)\n📌 Friday 6–7 PM → Math Problem Set 8\n📌 Friday 8–9 PM → Bio Chapter 7 Notes\n📌 Sunday 7–9 PM → Physics Lab Report\n\nI moved Bio from Wednesday because your focus drops about 30% that day. Want me to explain any of these choices?",
     timestamp: new Date(Date.now() - 5 * 60000)
   },
   {
@@ -21,7 +22,7 @@ const initialMessages: ChatMessage[] = [
   },
   {
     role: "ai",
-    content: "Great question! COSC125 Assignment 3 is due **tomorrow**, so it's your most urgent task right now.\n\nI also noticed you consistently hit your peak focus between **7–10 PM**. That's when your session quality is highest based on your history. Coding tasks like COSC125 benefit most from this window since they require deep concentration.\n\nI've estimated it will take about 2.5 hours — fits perfectly in tonight's slot with time to review before you sleep.",
+    content: "Great question! COSC125 Assignment 3 is due **tomorrow**, so it's your most urgent task right now.\n\nI also noticed you consistently hit your peak focus between **7–10 PM**. That's when your session quality is highest based on your history. Coding tasks like COSC125 benefit most from this window since they require deep concentration.\n\nIt should take about 2.5 hours, which fits perfectly in tonight's slot with time to review before you sleep.",
     timestamp: new Date(Date.now() - 3 * 60000)
   },
 ];
@@ -34,12 +35,12 @@ const quickPrompts = [
 ];
 
 const aiResponses: Record<string, string> = {
-  schedule: "This week you have 3 deadlines:\n\n• **COSC125 Assignment 3** — Tomorrow\n• **Math Problem Set 8** — Saturday\n• **Bio Chapter 7 Notes** — Saturday\n• **Physics Lab Report** — Wednesday (next week)\n\nYour heaviest day is Friday. I've distributed your study sessions across your free peak-hour windows to keep things balanced.",
-  start: "Right now, I'd recommend starting **COSC125 Assignment 3** — it's due tomorrow and requires about 2.5 hours of deep work. You're currently approaching your peak focus window (7–10 PM), which is ideal for coding tasks.\n\nHead to the Focus Session page and I'll have it pre-loaded for you.",
-  productivity: "Your productivity this week is tracking **15% above your baseline**! You've maintained a 12-day study streak and averaged 4.2 hours of focused work per day.\n\nYour strongest session was Saturday with 6.2 hours. Keep maintaining consistent evening sessions — that's when you perform best.",
-  peak: "Your next peak focus window starts at **7:00 PM** tonight. Based on your patterns, your focus score reaches 88–92/100 between 7 and 10 PM — that's your optimal deep work period.\n\nI've already scheduled your most cognitively demanding tasks (COSC125, Physics) during these windows.",
-  default: "I'm analyzing that based on your current workload and patterns. You have 3 upcoming deadlines and your productivity score is strong this week at 78/100.\n\nIs there a specific task, deadline, or study pattern you'd like me to dig into?",
-  break: "Based on your session history, you've averaged 128 minutes of focus today. A 15-minute break now would help you maintain quality for your evening session.\n\nI'd suggest stepping away from screens — a short walk or light stretching helps reset focus effectively.",
+  schedule: "This week you have 3 deadlines:\n\n• **COSC125 Assignment 3**: Tomorrow\n• **Math Problem Set 8**: Saturday\n• **Bio Chapter 7 Notes**: Saturday\n• **Physics Lab Report**: Wednesday (next week)\n\nYour heaviest day is Friday. I've spread your study sessions across your free peak-hour windows to keep things balanced.",
+  start: "Right now, I'd recommend starting **COSC125 Assignment 3**. It's due tomorrow and needs about 2.5 hours of deep work. You're currently approaching your peak focus window (7–10 PM), which is great for coding tasks.\n\nHead to the Focus Session page and I'll have it ready for you.",
+  productivity: "Your productivity this week is tracking **15% above your baseline**! You've kept a 12 day study streak going and averaged 4.2 hours of focused work per day.\n\nYour strongest session was Saturday with 6.2 hours. Keep those evening sessions coming, that's when you do your best work.",
+  peak: "Your next peak focus window starts at **7:00 PM** tonight. Based on your patterns, your focus score reaches 88–92/100 between 7 and 10 PM. That's your best window for deep work.\n\nI've already scheduled your toughest tasks (COSC125, Physics) during these windows.",
+  default: "I'm looking at your current workload and patterns. You have 3 upcoming deadlines and your productivity score is strong this week at 78/100.\n\nIs there a specific task, deadline, or study pattern you'd like me to dig into?",
+  break: "Based on your session history, you've averaged 128 minutes of focus today. A 15 minute break now would help you keep up the quality for your evening session.\n\nTry stepping away from screens. Even a short walk or a stretch helps reset your focus.",
 };
 
 function TypewriterText({ content, onDone }: { content: string; onDone?: () => void }) {
@@ -118,7 +119,7 @@ export function AIPanelPage() {
         className="shrink-0 p-6 border-b border-border flex items-center gap-4"
       >
         <div className="size-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
-          <Brain className="size-6 text-white" />
+          <ProdigyMark size={26} blink className="text-white" />
         </div>
         <div>
           <h1 className="text-2xl font-bold">AI Assistant</h1>
@@ -145,7 +146,7 @@ export function AIPanelPage() {
                 : "bg-secondary border border-border"
             }`}>
               {msg.role === "ai"
-                ? <Brain className="size-4 text-white" />
+                ? <ProdigyMark size={18} className="text-white" />
                 : <User className="size-4 text-foreground" />
               }
             </div>
@@ -172,7 +173,7 @@ export function AIPanelPage() {
             className="flex items-start gap-3"
           >
             <div className="size-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md shadow-primary/20">
-              <Brain className="size-4 text-white" />
+              <ProdigyMark size={18} className="text-white" />
             </div>
             <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border">
               <div className="flex gap-1.5 items-center h-4">

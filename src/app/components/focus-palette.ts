@@ -32,11 +32,16 @@ export const BACKGROUNDS: Record<BackgroundTheme, CanvasBackground> = {
 const DARK_VARS = {
   "--fx-fg": "rgba(255,255,255,0.95)",
   "--fx-fg-muted": "rgba(255,255,255,0.62)",
-  "--fx-fg-faint": "rgba(255,255,255,0.42)",
+  "--fx-fg-faint": "rgba(255,255,255,0.5)",
   "--fx-surface": "rgba(255,255,255,0.06)",
   "--fx-surface-hover": "rgba(255,255,255,0.1)",
   "--fx-surface-strong": "rgba(22,20,32,0.95)",
-  "--fx-connect-surface": "rgba(0,0,0,0.22)",
+  // Was rgba(0,0,0,0.22) — a black overlay on an already-dark canvas, which
+  // barely differs from the background it sits on. A card needs to be
+  // *lighter* than a dark background to read as an elevated surface (see
+  // --fx-surface above), the same way --fx-connect-surface in LIGHT_VARS
+  // below is lighter than its cream background. This was inverted.
+  "--fx-connect-surface": "rgba(255,255,255,0.08)",
   "--fx-border": "rgba(255,255,255,0.1)",
   "--fx-invert-bg": "#ffffff",
   "--fx-invert-fg": "#0a0a0a",

@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Brain, X, ChevronRight, Sparkles, AlertCircle, TrendingUp, Clock } from "lucide-react";
+import { X, ChevronRight, Sparkles, AlertCircle, TrendingUp, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAIEngine, type AIInsight } from "./ai-engine-context";
 import { useNavigate } from "react-router";
+import { ProdigyMark } from "./prodigy-mark";
 
 const iconMap: Record<string, any> = {
   schedule: Clock,
@@ -10,7 +11,7 @@ const iconMap: Record<string, any> = {
   optimization: TrendingUp,
   burnout: AlertCircle,
   celebration: Sparkles,
-  integration: Brain,
+  integration: ProdigyMark,
 };
 
 function NotificationCard({ insight, onDismiss }: { insight: AIInsight; onDismiss: () => void }) {

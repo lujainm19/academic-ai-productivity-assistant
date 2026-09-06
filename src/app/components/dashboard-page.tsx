@@ -458,7 +458,7 @@ export function DashboardPage() {
                   className="flex-1 min-w-0 flex items-start gap-2 text-left"
                 >
                   <Lightbulb className="size-4 text-primary shrink-0 mt-0.5" />
-                  <span className="text-xs flex-1 min-w-0">{topInsight.title} — {topInsight.body}</span>
+                  <span className="text-xs flex-1 min-w-0">{topInsight.title}: {topInsight.body}</span>
                 </button>
                 <button
                   onClick={() => dismissInsight(topInsight.id)}

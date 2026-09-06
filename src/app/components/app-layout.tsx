@@ -12,7 +12,7 @@ const navItems = [
   { path: "/focus", icon: Zap, label: "Focus" },
   { path: "/ai", icon: Brain, label: "AI Assistant", highlight: true },
   { path: "/progress", icon: Trophy, label: "Progress" },
-  { path: "/customize", icon: Settings, label: "Customize" }
+  { path: "/settings", icon: Settings, label: "Settings" }
 ];
 
 export function AppLayout() {
@@ -85,7 +85,7 @@ export function AppLayout() {
           <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 via-accent/10 to-primary/10 border border-primary/20">
             <div className="flex items-center gap-3 mb-3">
               <div className="size-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-                <Brain className="size-5 text-white" />
+                <ProdigyMark size={20} blink className="text-white" />
               </div>
               <div className="hidden lg:block flex-1 min-w-0">
                 <h4 className="font-medium truncate">You</h4>
