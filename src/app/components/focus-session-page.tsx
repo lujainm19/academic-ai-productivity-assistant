@@ -295,7 +295,7 @@ export function FocusSessionPage() {
                   transition={{ type: "spring", stiffness: 300, damping: 28 }}
                   className="w-full max-w-md text-center"
                 >
-                  <ProdigyMark size={40} mood="happy" blink className="text-white mx-auto mb-4" />
+                  <ProdigyMark size={40} blink className="text-white mx-auto mb-4" />
                   <p className="text-2xl mb-2 text-white" style={{ fontFamily: "'Fraunces', serif" }}>Build your focus space.</p>
                   <p className="text-sm text-white/50 mb-7">Add the things that help you focus, or start from a setup someone else already got right.</p>
                   <div className="grid grid-cols-2 gap-2.5 mb-3">

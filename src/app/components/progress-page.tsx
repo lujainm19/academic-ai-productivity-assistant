@@ -58,7 +58,7 @@ export function ProgressPage() {
               <p className="text-muted-foreground">steady progress</p>
             </div>
             <div className="size-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
-              <ProdigyMark size={44} mood="happy" blink className="text-white" />
+              <ProdigyMark size={44} blink className="text-white" />
             </div>
           </div>
           <div className="space-y-2">
