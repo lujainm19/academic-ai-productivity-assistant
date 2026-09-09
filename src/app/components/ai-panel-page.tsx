@@ -1,31 +1,19 @@
+// ai-panel-page.tsx
+// Prodigy AI chat page — powered by Gemini via the backend /api/ai/chat endpoint.
+// Sends the full conversation history with every message so Prodigy remembers
+// the context of the ongoing conversation, not just the last message.
+
 import { motion } from "motion/react";
-import { Send, User, Sparkles, Calendar, Target, TrendingUp, Zap } from "lucide-react";
+import { Send, User, Sparkles, Calendar, Target, TrendingUp, Zap, AlertCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { ProdigyMark } from "./prodigy-mark";
+import { useLocalData } from "./local-data-context";
 
 interface ChatMessage {
   role: "ai" | "user";
   content: string;
   timestamp: Date;
 }
-
-const initialMessages: ChatMessage[] = [
-  {
-    role: "ai",
-    content: "Hey Alex! I looked at your schedule and found some good patterns.\n\nYou have **3 deadlines this week**, so here's my recommended study plan:\n\n📌 Tonight 7–9 PM → COSC125 Assignment 3 (due tomorrow)\n📌 Friday 6–7 PM → Math Problem Set 8\n📌 Friday 8–9 PM → Bio Chapter 7 Notes\n📌 Sunday 7–9 PM → Physics Lab Report\n\nI moved Bio from Wednesday because your focus drops about 30% that day. Want me to explain any of these choices?",
-    timestamp: new Date(Date.now() - 5 * 60000)
-  },
-  {
-    role: "user",
-    content: "Why did you schedule COSC125 tonight specifically?",
-    timestamp: new Date(Date.now() - 4 * 60000)
-  },
-  {
-    role: "ai",
-    content: "Great question! COSC125 Assignment 3 is due **tomorrow**, so it's your most urgent task right now.\n\nI also noticed you consistently hit your peak focus between **7–10 PM**. That's when your session quality is highest based on your history. Coding tasks like COSC125 benefit most from this window since they require deep concentration.\n\nIt should take about 2.5 hours, which fits perfectly in tonight's slot with time to review before you sleep.",
-    timestamp: new Date(Date.now() - 3 * 60000)
-  },
-];
 
 const quickPrompts = [
   { icon: Calendar, label: "What's my schedule this week?" },
@@ -34,15 +22,21 @@ const quickPrompts = [
   { icon: Zap, label: "When is my next peak focus window?" },
 ];
 
-const aiResponses: Record<string, string> = {
-  schedule: "This week you have 3 deadlines:\n\n• **COSC125 Assignment 3**: Tomorrow\n• **Math Problem Set 8**: Saturday\n• **Bio Chapter 7 Notes**: Saturday\n• **Physics Lab Report**: Wednesday (next week)\n\nYour heaviest day is Friday. I've spread your study sessions across your free peak-hour windows to keep things balanced.",
-  start: "Right now, I'd recommend starting **COSC125 Assignment 3**. It's due tomorrow and needs about 2.5 hours of deep work. You're currently approaching your peak focus window (7–10 PM), which is great for coding tasks.\n\nHead to the Focus Session page and I'll have it ready for you.",
-  productivity: "Your productivity this week is tracking **15% above your baseline**! You've kept a 12 day study streak going and averaged 4.2 hours of focused work per day.\n\nYour strongest session was Saturday with 6.2 hours. Keep those evening sessions coming, that's when you do your best work.",
-  peak: "Your next peak focus window starts at **7:00 PM** tonight. Based on your patterns, your focus score reaches 88–92/100 between 7 and 10 PM. That's your best window for deep work.\n\nI've already scheduled your toughest tasks (COSC125, Physics) during these windows.",
-  default: "I'm looking at your current workload and patterns. You have 3 upcoming deadlines and your productivity score is strong this week at 78/100.\n\nIs there a specific task, deadline, or study pattern you'd like me to dig into?",
-  break: "Based on your session history, you've averaged 128 minutes of focus today. A 15 minute break now would help you keep up the quality for your evening session.\n\nTry stepping away from screens. Even a short walk or a stretch helps reset your focus.",
-};
+// Formats **bold** markdown and newlines into readable JSX
+function formatMessage(content: string) {
+  return content.split("\n").map((line, i) => {
+    const boldified = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    return (
+      <p
+        key={i}
+        className={line === "" ? "h-2" : "leading-relaxed"}
+        dangerouslySetInnerHTML={{ __html: boldified }}
+      />
+    );
+  });
+}
 
+// Typewriter effect for the latest AI message so it feels alive
 function TypewriterText({ content, onDone }: { content: string; onDone?: () => void }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
@@ -65,40 +59,70 @@ function TypewriterText({ content, onDone }: { content: string; onDone?: () => v
   return <span className="whitespace-pre-wrap">{done ? content : displayed}</span>;
 }
 
-function formatMessage(content: string) {
-  return content.split("\n").map((line, i) => {
-    const boldified = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    return <p key={i} className={line === "" ? "h-2" : "leading-relaxed"} dangerouslySetInnerHTML={{ __html: boldified }} />;
-  });
-}
-
 export function AIPanelPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  // Pull real task data to give Prodigy context about what the student has to do
+  const { tasks, stats } = useLocalData();
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [lastAiIndex, setLastAiIndex] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to bottom whenever messages update
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const sendMessage = (text: string) => {
+  // Build a context string from the student's real tasks so Prodigy
+  // gives grounded answers instead of generic ones
+  const buildContext = () => {
+    const pendingTasks = tasks.filter(t => !t.completed);
+    const completedCount = tasks.filter(t => t.completed).length;
+
+    const taskList = pendingTasks.length > 0
+      ? pendingTasks
+          .map(t => `- ${t.title} (due: ${t.due}, priority: ${t.priority})`)
+          .join("\n")
+      : "No pending tasks.";
+
+    return [
+      `Student stats: Level ${stats.level}, ${stats.xp} XP, ${stats.streak}-day streak, ${completedCount} tasks completed.`,
+      `Pending tasks:\n${taskList}`,
+      `Current time: ${new Date().toLocaleString()}.`,
+    ].join("\n\n");
+  };
+
+  const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
+
     const userMsg: ChatMessage = { role: "user", content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
+    setError(null);
 
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      const reply =
-        lower.includes("schedule") || lower.includes("week") ? aiResponses.schedule
-        : lower.includes("start") || lower.includes("now") || lower.includes("which") ? aiResponses.start
-        : lower.includes("productiv") || lower.includes("trend") || lower.includes("progress") ? aiResponses.productivity
-        : lower.includes("peak") || lower.includes("focus window") || lower.includes("when") ? aiResponses.peak
-        : lower.includes("break") || lower.includes("rest") ? aiResponses.break
-        : aiResponses.default;
+    try {
+      // Send full conversation history so Prodigy remembers context
+      const history = messages.map(m => ({ role: m.role, content: m.content }));
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history,
+          context: buildContext(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? `Server error ${res.status}`);
+      }
+
+      const { reply } = await res.json();
 
       const aiMsg: ChatMessage = { role: "ai", content: reply, timestamp: new Date() };
       setMessages(prev => {
@@ -106,12 +130,16 @@ export function AIPanelPage() {
         setLastAiIndex(next.length - 1);
         return next;
       });
+    } catch (err: any) {
+      setError(err.message ?? "Something went wrong. Try again.");
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 500);
+    }
   };
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -122,22 +150,42 @@ export function AIPanelPage() {
           <ProdigyMark size={26} blink className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">AI Assistant</h1>
+          <h1 className="text-2xl font-bold">Prodigy</h1>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="size-2 rounded-full bg-green-500 animate-pulse inline-block" />
-            Active · Monitoring your schedule
+            Active · Ready to help you study smarter
           </div>
         </div>
       </motion.div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+
+        {/* Empty state — shown before first message */}
+        {messages.length === 0 && !isTyping && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center h-full text-center gap-4 pb-20"
+          >
+            <div className="size-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
+              <ProdigyMark size={32} blink className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold mb-1">Hey, I'm Prodigy</h2>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Your AI study assistant. Ask me anything about your tasks, deadlines, or how to study smarter.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {messages.map((msg, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i < initialMessages.length ? 0 : 0.1 }}
+            transition={{ delay: 0.05 }}
             className={`flex items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
           >
             <div className={`size-9 rounded-full flex items-center justify-center shrink-0 ${
@@ -166,6 +214,7 @@ export function AIPanelPage() {
           </motion.div>
         ))}
 
+        {/* Typing indicator */}
         {isTyping && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -177,18 +226,35 @@ export function AIPanelPage() {
             </div>
             <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border">
               <div className="flex gap-1.5 items-center h-4">
-                {[0, 1, 2].map(i => (
-                  <span key={i} className="size-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                {[0, 1, 2].map(j => (
+                  <span
+                    key={j}
+                    className="size-2 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: `${j * 0.15}s` }}
+                  />
                 ))}
               </div>
             </div>
           </motion.div>
         )}
+
+        {/* Error message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm"
+          >
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+
         <div ref={endRef} />
       </div>
 
-      {/* Quick Prompts */}
-      {messages.length <= initialMessages.length && (
+      {/* Quick Prompts — shown before first message */}
+      {messages.length === 0 && (
         <div className="shrink-0 px-6 pb-2">
           <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
             <Sparkles className="size-3" /> Quick actions
@@ -215,7 +281,7 @@ export function AIPanelPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
-            placeholder="Ask anything about your schedule, tasks, or study patterns…"
+            placeholder="Ask Prodigy anything about your tasks, schedule, or study habits…"
             className="flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
             disabled={isTyping}
           />
@@ -227,7 +293,9 @@ export function AIPanelPage() {
             <Send className="size-4" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-2">AI responses are based on your Canvas data and productivity patterns</p>
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          Prodigy sees your real tasks and stats to give you grounded advice
+        </p>
       </div>
     </div>
   );

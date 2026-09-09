@@ -8,7 +8,7 @@ import { ProdigyMark } from "./prodigy-mark";
 const navItems = [
   { path: "/tasks", icon: Target, label: "Tasks" },
   { path: "/focus", icon: Zap, label: "Focus" },
-  { path: "/ai", icon: Brain, label: "AI Assistant", highlight: true },
+  { path: "/ai", icon: Brain, label: "Prodigy - AI Assistant", highlight: true },
   { path: "/settings", icon: Settings, label: "Settings" }
 ];
 
