@@ -83,7 +83,7 @@ export function AIPanelPage() {
 
     const taskList = pendingTasks.length > 0
       ? pendingTasks
-          .map(t => `- ${t.title} (due: ${t.due}, priority: ${t.priority})`)
+          .map(t => `- ${t.title} (due: ${t.dueDate ?? "no due date"}, priority: ${t.priority})`)
           .join("\n")
       : "No pending tasks.";
 

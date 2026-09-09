@@ -1,30 +1,25 @@
+// task-planner-page.tsx
+// Real tasks now — the board used to run on its own hardcoded array (7
+// fake tasks pinned to a fixed "today" in the past) completely disconnected
+// from the store every other page reads, completing a task here did
+// nothing to your XP/streak/Focus canvas. It's on useLocalData() now, the
+// same store Focus's Tasks widget and the Growth streak ring read, so this
+// is genuinely the same list everywhere, not a lookalike.
+//
+// Also gone: the fake "Canvas LMS synced" banner and the per-task
+// "aiTimeSlot" chip ("Tonight 7–9 PM") — both were invented strings with
+// nothing real behind them. The urgency score is still here, but it's a
+// plain formula over real fields (priority + days left), not dressed up
+// as "AI" when it's arithmetic.
+
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Calendar, Clock, Zap, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Link2, Flame, ListTodo, Loader2 } from "lucide-react";
+import { Plus, Calendar, Clock, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Flame, ListTodo, Loader2, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { useAIEngine, canvasCourses } from "./ai-engine-context";
+import { useAIEngine } from "./ai-engine-context";
+import { useLocalData, Task } from "./local-data-context";
 import { ProdigyMark } from "./prodigy-mark";
 
-type Status = "todo" | "in-progress" | "done";
-
-const initialTasks = [
-  { id: 1, title: "COSC125 Assignment 3", due: "2026-05-29", priority: "high" as const, energy: "Deep Work", duration: "2h", durationHours: 2, course: "COSC125", courseColor: "#6366f1", status: "todo" as Status, weight: 15, difficulty: 3, aiTimeSlot: "Tonight 7–9 PM" },
-  { id: 2, title: "Read Chapter 7 - Biology", due: "2026-05-30", priority: "medium" as const, energy: "Medium Focus", duration: "1h", durationHours: 1, course: "BIO201", courseColor: "#10b981", status: "in-progress" as Status, weight: 5, difficulty: 2, aiTimeSlot: "Fri 8–9 PM" },
-  { id: 3, title: "Math Practice Problems", due: "2026-05-31", priority: "medium" as const, energy: "Deep Work", duration: "1.5h", durationHours: 1.5, course: "MATH210", courseColor: "#f59e0b", status: "todo" as Status, weight: 10, difficulty: 4, aiTimeSlot: "Fri 6–7 PM" },
-  { id: 4, title: "Essay Outline - English", due: "2026-06-02", priority: "low" as const, energy: "Low Energy", duration: "45m", durationHours: 0.75, course: "ENG102", courseColor: "#ec4899", status: "todo" as Status, weight: 8, difficulty: 2, aiTimeSlot: "Mon 5–6 PM" },
-  { id: 5, title: "Physics Lab Report", due: "2026-06-03", priority: "high" as const, energy: "Deep Work", duration: "3h", durationHours: 3, course: "PHYS110", courseColor: "#8b5cf6", status: "todo" as Status, weight: 15, difficulty: 4, aiTimeSlot: "Sun 7–10 PM" },
-  { id: 6, title: "History Reading Notes", due: "2026-06-04", priority: "low" as const, energy: "Low Energy", duration: "30m", durationHours: 0.5, course: "HIST150", courseColor: "#64748b", status: "done" as Status, weight: 5, difficulty: 1, aiTimeSlot: "Sat 3–4 PM" },
-  { id: 7, title: "Programming Project Setup", due: "2026-06-05", priority: "medium" as const, energy: "Medium Focus", duration: "1h", durationHours: 1, course: "COSC125", courseColor: "#6366f1", status: "in-progress" as Status, weight: 20, difficulty: 3, aiTimeSlot: "Tue 7–8 PM" },
-];
-
-type PlannerTask = typeof initialTasks[0];
-
-const TODAY = new Date("2026-05-28");
-
-const urgencyScore = (task: PlannerTask) => {
-  const due = new Date(task.due);
-  const daysLeft = Math.max(0, Math.ceil((due.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24)));
-  return (task.weight * task.difficulty) / (daysLeft + 1);
-};
+type Status = Task["status"] | "done";
 
 const columns: { id: Status; label: string; icon: typeof ListTodo; accent: string }[] = [
   { id: "todo", label: "To Do", icon: ListTodo, accent: "bg-muted-foreground" },
@@ -32,54 +27,109 @@ const columns: { id: Status; label: string; icon: typeof ListTodo; accent: strin
   { id: "done", label: "Done", icon: CheckCircle2, accent: "bg-green-500" },
 ];
 
+const PRIORITY_WEIGHT: Record<Task["priority"], number> = { high: 3, medium: 2, low: 1 };
+
+// A plain formula, not a model: higher priority and a closer due date both
+// push urgency up. No due date at all just falls back to priority alone,
+// still real inputs, no invented per-task numbers standing in for it.
+function urgencyScore(task: Task, today: Date): number {
+  if (!task.dueDate) return PRIORITY_WEIGHT[task.priority] * 5;
+  const daysLeft = Math.max(0, Math.ceil((new Date(task.dueDate).getTime() - today.getTime()) / 86400000));
+  return (PRIORITY_WEIGHT[task.priority] * 10) / (daysLeft + 1);
+}
+
+function getDaysUntilDue(dueDate: string | null, today: Date): string {
+  if (!dueDate) return "No due date";
+  const due = new Date(dueDate);
+  const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return "Overdue";
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays <= 3) return `In ${diffDays} days`;
+  return `${diffDays} days`;
+}
+
+// A small fixed palette, cycled by a hash of the course name, so typing
+// "COSC125" always lands on the same color for that course without
+// needing a real course list to look it up in.
+const COURSE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#64748b"];
+function courseColorFor(course: string): string {
+  let hash = 0;
+  for (let i = 0; i < course.length; i++) hash = (hash * 31 + course.charCodeAt(i)) >>> 0;
+  return COURSE_COLORS[hash % COURSE_COLORS.length];
+}
+
 export function TaskPlannerPage() {
   const { insights, isAnalyzing } = useAIEngine();
-  const [tasks, setTasks] = useState<PlannerTask[]>(initialTasks);
+  const { tasks, addTask, completeTask, setTaskStatus, deleteTask } = useLocalData();
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [aiSorted, setAiSorted] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
+
+  const [newTitle, setNewTitle] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newCourse, setNewCourse] = useState("");
+  const [newPriority, setNewPriority] = useState<Task["priority"]>("medium");
+  const [titleError, setTitleError] = useState(false);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const filtered = tasks
     .filter(t => filter === "all" || t.priority === filter)
-    .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.course.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.course ?? "").toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const getDaysUntilDue = (dueDate: string) => {
-    const due = new Date(dueDate);
-    const diffDays = Math.ceil((due.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays <= 0) return "Overdue";
-    if (diffDays === 1) return "Tomorrow";
-    if (diffDays <= 3) return `In ${diffDays} days`;
-    return `${diffDays} days`;
-  };
-
+  const [sortedIds, setSortedIds] = useState<string[] | null>(null);
   const handleAISort = () => {
     setAiSorted(true);
-    setTasks(prev => [...prev].sort((a, b) => urgencyScore(b) - urgencyScore(a)));
+    setSortedIds([...tasks].sort((a, b) => urgencyScore(b, today) - urgencyScore(a, today)).map(t => t.id));
   };
 
-  const moveTask = (id: number, status: Status) => {
-    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status } : t)));
+  const moveTask = (id: string, target: Status) => {
+    if (target === "done") completeTask(id);
+    else setTaskStatus(id, target);
+  };
+
+  const resetAddForm = () => {
+    setNewTitle(""); setNewDueDate(""); setNewCourse(""); setNewPriority("medium"); setTitleError(false);
+  };
+
+  const handleSubmitAdd = () => {
+    if (!newTitle.trim()) { setTitleError(true); return; }
+    addTask({
+      title: newTitle.trim(),
+      priority: newPriority,
+      dueDate: newDueDate || null,
+      course: newCourse.trim() || undefined,
+      courseColor: newCourse.trim() ? courseColorFor(newCourse.trim()) : undefined,
+    });
+    resetAddForm();
+    setShowAddModal(false);
   };
 
   const aiInsight = insights.find(i => !i.dismissed && i.type === "schedule");
 
   // ── Board stats ──────────────────────────────────────────────────────────
-  const openTasks = tasks.filter(t => t.status !== "done");
+  const openTasks = tasks.filter(t => !t.completed);
   const highPriorityOpen = openTasks.filter(t => t.priority === "high").length;
-  const hoursRemaining = openTasks.reduce((sum, t) => sum + t.durationHours, 0);
-  const doneCount = tasks.filter(t => t.status === "done").length;
+  const hoursRemaining = openTasks.reduce((sum, t) => sum + (t.estimatedHours ?? 1), 0);
+  const doneCount = tasks.filter(t => t.completed).length;
   const completionPct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+
+  // If a sort was applied, use it to order every column; otherwise fall
+  // back to however useLocalData already orders things (newest first).
+  const ordered = sortedIds ? [...filtered].sort((a, b) => sortedIds.indexOf(a.id) - sortedIds.indexOf(b.id)) : filtered;
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Header — a board, not a checklist: the framing here is workload
-            and throughput ("what's open, what's moving"), distinct from the
-            Dashboard's "what's next right now" framing. */}
+            and throughput ("what's open, what's moving"), distinct from a
+            single "what's next right now" framing. */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-2">Task Planner</h1>
@@ -155,20 +205,11 @@ export function TaskPlannerPage() {
           )}
         </AnimatePresence>
 
-        {/* Canvas Integration Status */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card border border-border text-xs">
-            <Link2 className="size-3 text-green-500" />
-            Canvas LMS · {tasks.length} tasks synced
-            <span className="size-2 rounded-full bg-green-500" />
+        {isAnalyzing && (
+          <div className="flex items-center gap-1.5 text-xs text-primary">
+            <Loader2 className="size-3 animate-spin" /> Re-analyzing workload…
           </div>
-          <div className="text-xs text-muted-foreground">Last sync 8 min ago</div>
-          {isAnalyzing && (
-            <div className="flex items-center gap-1.5 text-xs text-primary">
-              <Loader2 className="size-3 animate-spin" /> Re-analyzing workload…
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Search + Filter */}
         <div className="flex items-center gap-4 flex-wrap">
@@ -203,12 +244,13 @@ export function TaskPlannerPage() {
         </div>
 
         {/* ── Status board ──────────────────────────────────────────────────
-            Three columns instead of one flat list — this is the planner's
-            distinct layout paradigm. Drag a card (or use the arrow buttons
-            that appear on hover, for keyboard/touch users) to move it. */}
+            Three columns instead of one flat list. Drag a card (or use the
+            arrow buttons that appear on hover, for keyboard/touch users) to
+            move it. Moving into Done actually completes the task, XP and
+            streak included, the same as finishing it anywhere else. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           {columns.map(col => {
-            const colTasks = filtered.filter(t => t.status === col.id);
+            const colTasks = ordered.filter(t => (col.id === "done" ? t.completed : !t.completed && t.status === col.id));
             const isOver = dragOverCol === col.id;
             return (
               <div
@@ -217,7 +259,7 @@ export function TaskPlannerPage() {
                 onDragLeave={() => setDragOverCol(prev => (prev === col.id ? null : prev))}
                 onDrop={e => {
                   e.preventDefault();
-                  const id = Number(e.dataTransfer.getData("text/plain"));
+                  const id = e.dataTransfer.getData("text/plain");
                   if (id) moveTask(id, col.id);
                   setDraggingId(null);
                   setDragOverCol(null);
@@ -236,9 +278,9 @@ export function TaskPlannerPage() {
 
                 <AnimatePresence>
                   {colTasks.map(task => {
-                    const daysLeft = Math.ceil((new Date(task.due).getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
-                    const urgency = urgencyScore(task);
-                    const done = task.status === "done";
+                    const daysLeft = task.dueDate ? Math.ceil((new Date(task.dueDate).getTime() - today.getTime()) / 86400000) : null;
+                    const urgency = urgencyScore(task, today);
+                    const done = task.completed;
 
                     return (
                       <motion.div
@@ -248,7 +290,7 @@ export function TaskPlannerPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, height: 0 }}
                         draggable
-                        onDragStart={e => { e.dataTransfer.setData("text/plain", String(task.id)); setDraggingId(task.id); }}
+                        onDragStart={e => { e.dataTransfer.setData("text/plain", task.id); setDraggingId(task.id); }}
                         onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
                         className={`group p-4 rounded-xl bg-card border transition-all cursor-grab active:cursor-grabbing ${
                           draggingId === task.id ? "opacity-40" : "opacity-100"
@@ -256,34 +298,28 @@ export function TaskPlannerPage() {
                       >
                         <div className="flex items-start gap-2">
                           <GripVertical className="size-4 text-muted-foreground mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                          <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: task.courseColor }} />
+                          {task.courseColor && <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: task.courseColor }} />}
                           <div className="flex-1 min-w-0 space-y-2">
                             <div className="flex items-start gap-2 flex-wrap">
                               <h4 className={`text-sm font-semibold ${done ? "line-through text-muted-foreground" : ""}`}>{task.title}</h4>
-                              {task.priority === "high" && daysLeft <= 2 && !done && (
+                              {task.priority === "high" && daysLeft !== null && daysLeft <= 2 && !done && (
                                 <span className="flex items-center gap-1 text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full">
                                   <AlertCircle className="size-2.5" /> Urgent
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                              <span className="flex items-center gap-1"><Calendar className="size-3" />{getDaysUntilDue(task.due)}</span>
-                              <span className="flex items-center gap-1"><Clock className="size-3" />{task.duration}</span>
-                              <span className="px-1.5 py-0.5 rounded-full bg-muted/50" style={{ color: task.courseColor }}>{task.course}</span>
+                              <span className="flex items-center gap-1"><Calendar className="size-3" />{getDaysUntilDue(task.dueDate, today)}</span>
+                              {task.estimatedHours && <span className="flex items-center gap-1"><Clock className="size-3" />{task.estimatedHours}h</span>}
+                              {task.course && <span className="px-1.5 py-0.5 rounded-full bg-muted/50" style={{ color: task.courseColor }}>{task.course}</span>}
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <div className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${task.priority === "high" ? "bg-destructive/20 text-destructive" : task.priority === "medium" ? "bg-accent/20 text-accent" : "bg-muted/50 text-muted-foreground"}`}>
                                 {task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low"}
                               </div>
                               {!done && (
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-primary/10 text-primary border border-primary/20">
-                                  <Sparkles className="size-2.5" />
-                                  {task.aiTimeSlot}
-                                </div>
-                              )}
-                              {!done && (
                                 <div className={`ml-auto text-[10px] font-bold ${urgency > 20 ? "text-red-400" : urgency > 10 ? "text-amber-400" : "text-muted-foreground"}`}>
-                                  AI {urgency.toFixed(0)}
+                                  urgency {urgency.toFixed(0)}
                                 </div>
                               )}
                             </div>
@@ -291,7 +327,7 @@ export function TaskPlannerPage() {
                             {/* Move controls — hover-revealed, keeps the board
                                 usable without relying on drag alone */}
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pt-1">
-                              {columns.filter(c => c.id !== task.status).map(c => (
+                              {columns.filter(c => c.id !== (done ? "done" : task.status)).map(c => (
                                 <button
                                   key={c.id}
                                   onClick={() => moveTask(task.id, c.id)}
@@ -300,6 +336,13 @@ export function TaskPlannerPage() {
                                   Move to {c.label}
                                 </button>
                               ))}
+                              <button
+                                onClick={() => deleteTask(task.id)}
+                                aria-label="Delete task"
+                                className="ml-auto p-1 rounded-md hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -333,7 +376,7 @@ export function TaskPlannerPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-              onClick={() => setShowAddModal(false)}
+              onClick={() => { setShowAddModal(false); resetAddForm(); }}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
@@ -342,26 +385,68 @@ export function TaskPlannerPage() {
                 onClick={e => e.stopPropagation()}
                 className="w-full max-w-md p-6 rounded-2xl bg-card border border-border shadow-2xl space-y-4"
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <Brain className="size-5 text-primary" />
-                  <h3 className="font-semibold">Add New Task</h3>
-                </div>
-                <input placeholder="Task title" className="w-full px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary outline-none text-sm" />
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="date" className="px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary outline-none text-sm" />
-                  <select className="px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary outline-none text-sm">
-                    {canvasCourses.map(c => <option key={c.id}>{c.id.toUpperCase()}</option>)}
-                  </select>
-                </div>
-                <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-start gap-2">
-                  <Sparkles className="size-4 text-primary mt-0.5 shrink-0" />
-                  <p className="text-xs text-muted-foreground">AI will automatically determine priority, schedule the optimal study time, and add it to your focus plan.</p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowAddModal(false)} className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-all">
-                    Add & Let AI Schedule
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="size-5 text-primary" />
+                    <h3 className="font-semibold">Add New Task</h3>
+                  </div>
+                  <button onClick={() => { setShowAddModal(false); resetAddForm(); }} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="size-4" />
                   </button>
-                  <button onClick={() => setShowAddModal(false)} className="px-5 py-3 rounded-xl bg-secondary border border-border text-sm hover:bg-secondary/80 transition-all">
+                </div>
+
+                <div>
+                  <input
+                    placeholder="Task title"
+                    value={newTitle}
+                    onChange={e => { setNewTitle(e.target.value); if (titleError) setTitleError(false); }}
+                    onKeyDown={e => { if (e.key === "Enter") handleSubmitAdd(); }}
+                    className={`w-full px-4 py-3 rounded-xl bg-secondary border outline-none text-sm transition-colors ${titleError ? "border-destructive" : "border-border focus:border-primary"}`}
+                  />
+                  {titleError && <p className="text-xs text-destructive mt-1.5">Give it a title first</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={e => setNewDueDate(e.target.value)}
+                    className="px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary outline-none text-sm"
+                  />
+                  <input
+                    placeholder="Course (optional)"
+                    value={newCourse}
+                    onChange={e => setNewCourse(e.target.value)}
+                    className="px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary outline-none text-sm"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Priority</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["high", "medium", "low"] as const).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setNewPriority(p)}
+                        className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                          newPriority === p
+                            ? p === "high" ? "bg-destructive text-destructive-foreground"
+                              : p === "medium" ? "bg-accent text-accent-foreground"
+                              : "bg-muted text-muted-foreground"
+                            : "bg-secondary border border-border hover:bg-secondary/70"
+                        }`}
+                      >
+                        {p === "high" ? "High" : p === "medium" ? "Medium" : "Low"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={handleSubmitAdd} className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-all">
+                    Add Task
+                  </button>
+                  <button onClick={() => { setShowAddModal(false); resetAddForm(); }} className="px-5 py-3 rounded-xl bg-secondary border border-border text-sm hover:bg-secondary/80 transition-all">
                     Cancel
                   </button>
                 </div>
