@@ -8,7 +8,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
-export type WidgetType = "tasks" | "photo" | "note" | "clock" | "growth" | "canvas" | "spotify" | "calendar";
+export type WidgetType = "tasks" | "photo" | "note" | "clock" | "growth";
 export type WidgetSize = "s" | "m" | "l";
 export type BackgroundTheme = "cream" | "black" | "deepFocus" | "nightStudy" | "cozy" | "dreamy";
 
@@ -32,9 +32,6 @@ export const WIDGET_DIMENSIONS: Record<WidgetType, Record<WidgetSize, { w: numbe
   note:     { s: { w: 170, h: 130 }, m: { w: 210, h: 170 }, l: { w: 250, h: 210 } },
   clock:    { s: { w: 140, h: 90 },  m: { w: 170, h: 110 }, l: { w: 200, h: 130 } },
   growth:   { s: { w: 130, h: 150 }, m: { w: 160, h: 180 }, l: { w: 190, h: 210 } },
-  canvas:   { s: { w: 210, h: 100 }, m: { w: 240, h: 120 }, l: { w: 270, h: 150 } },
-  spotify:  { s: { w: 210, h: 90 },  m: { w: 240, h: 110 }, l: { w: 270, h: 140 } },
-  calendar: { s: { w: 210, h: 100 }, m: { w: 240, h: 130 }, l: { w: 270, h: 160 } },
 };
 
 export const WIDGET_LIBRARY: { type: WidgetType; label: string; hint: string }[] = [
@@ -43,9 +40,6 @@ export const WIDGET_LIBRARY: { type: WidgetType; label: string; hint: string }[]
   { type: "note", label: "Sticky note", hint: "Write anything" },
   { type: "clock", label: "Clock", hint: "The time, quietly" },
   { type: "growth", label: "Streak", hint: "Progress to your next badge" },
-  { type: "canvas", label: "Canvas", hint: "Next assignment due" },
-  { type: "spotify", label: "Spotify", hint: "Connect your music" },
-  { type: "calendar", label: "Calendar", hint: "Connect Google Calendar" },
 ];
 
 interface Template {
@@ -70,7 +64,7 @@ export const TEMPLATES: Template[] = [
     label: "Study desk",
     widgets: [
       { type: "tasks", x: 6, y: 18, size: "m", rotation: -1, config: {} },
-      { type: "canvas", x: 66, y: 15, size: "m", rotation: 1, config: {} },
+      { type: "clock", x: 68, y: 15, size: "s", rotation: 1, config: {} },
       { type: "note", x: 68, y: 62, size: "s", rotation: -2, config: { text: "Deep breath. One task at a time.", color: "sage" } },
     ],
   },
@@ -113,10 +107,18 @@ const WIDGETS_KEY = "focus.widgets";
 const BG_KEY = "focus.background";
 const ONBOARDED_KEY = "focus.hasOnboarded";
 
+const VALID_WIDGET_TYPES: WidgetType[] = ["tasks", "photo", "note", "clock", "growth"];
+
 function loadWidgets(): CanvasWidget[] | null {
   try {
     const raw = localStorage.getItem(WIDGETS_KEY);
-    return raw ? (JSON.parse(raw) as CanvasWidget[]) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CanvasWidget[];
+    // Guards against widget types retired in an earlier version (Canvas,
+    // Spotify, Google Calendar) still sitting on a returning user's canvas —
+    // renderWidgetBody has no case for them anymore, so silently drop them
+    // rather than showing an empty frame.
+    return parsed.filter(w => VALID_WIDGET_TYPES.includes(w.type));
   } catch {
     return null;
   }

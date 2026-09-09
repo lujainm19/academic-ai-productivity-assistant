@@ -1,9 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { LandingPage } from "./components/landing-page";
-import { DashboardPage } from "./components/dashboard-page";
 import { TaskPlannerPage } from "./components/task-planner-page";
 import { FocusSessionPage } from "./components/focus-session-page";
-import { ProgressPage } from "./components/progress-page";
 import { SettingsPage } from "./components/settings-page";
 import { AIPanelPage } from "./components/ai-panel-page";
 import { AppLayout } from "./components/app-layout";
@@ -26,10 +24,8 @@ export default function App() {
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/focus" element={<FocusSessionPage />} />
                     <Route element={<AppLayout />}>
-                      <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/tasks" element={<TaskPlannerPage />} />
                       <Route path="/ai" element={<AIPanelPage />} />
-                      <Route path="/progress" element={<ProgressPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

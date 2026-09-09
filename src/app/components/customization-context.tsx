@@ -21,8 +21,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 export type ThemeId = "midnight" | "ocean" | "forest" | "sunset" | "rose" | "lavender";
-export type FocusDuration = "15" | "25" | "50";
-export type BreakDuration = "5" | "10" | "15";
+// Minutes, as a string (matches how these round-trip through <select>/text
+// inputs and localStorage). Not a fixed set of presets, any whole number
+// a control chooses to write is valid; callers are responsible for their
+// own reasonable bounds.
+export type FocusDuration = string;
+export type BreakDuration = string;
 
 export interface CustomizationSettings {
   themeId: ThemeId;
@@ -60,6 +64,11 @@ interface CustomizationContextValue {
   setFocusDuration: (v: FocusDuration) => void;
   setBreakDuration: (v: BreakDuration) => void;
   saveChanges: () => void;
+  // Sets and persists in one step — for controls like the Focus page's
+  // inline timer editor, where every change should apply immediately,
+  // not sit in `settings` (the draft) until a separate Save click like
+  // the Settings page's flow.
+  applyNow: (patch: Partial<CustomizationSettings>) => void;
   resetToDefault: () => void;
   hasUnsavedChanges: boolean;
 }
@@ -137,6 +146,17 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     applyTheme(draft.themeId);
   };
 
+  // Merges onto the current draft and commits straight to saved, computed
+  // from `draft` in this closure rather than reading state back after a
+  // set call, so it can't apply a patch on top of a stale value.
+  const applyNow = (patch: Partial<CustomizationSettings>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    setSaved(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    if (patch.themeId) applyTheme(patch.themeId);
+  };
+
   const resetToDefault = () => {
     setDraft(DEFAULT_SETTINGS);
     setSaved(DEFAULT_SETTINGS);
@@ -149,7 +169,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       settings: draft,
       savedSettings: saved,
       setTheme, setBreakReminders, setFocusDuration, setBreakDuration,
-      saveChanges, resetToDefault,
+      saveChanges, applyNow, resetToDefault,
       hasUnsavedChanges,
     }}>
       {children}

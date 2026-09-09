@@ -160,7 +160,7 @@ export function LandingPage() {
             <span className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>prodigy</span>
           </div>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/focus")}
             className="px-5 py-2.5 rounded-full text-sm font-medium transition-transform hover:scale-105"
             style={{ background: INK, color: CREAM }}
           >
@@ -246,7 +246,7 @@ export function LandingPage() {
             className="mt-8 flex items-center justify-center gap-3"
           >
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/focus")}
               className="px-6 py-3.5 rounded-full font-medium flex items-center gap-2 transition-transform hover:scale-105 shadow-lg"
               style={{ background: INK, color: CREAM, boxShadow: "0 10px 30px -8px rgba(26,26,26,0.5)" }}
             >
@@ -391,7 +391,7 @@ export function LandingPage() {
           free, no account needed until you want one.
         </p>
         <button
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/focus")}
           className="mt-7 px-7 py-4 rounded-full font-medium inline-flex items-center gap-2 transition-transform hover:scale-105 shadow-lg"
           style={{ background: INK, color: CREAM, boxShadow: "0 10px 30px -8px rgba(26,26,26,0.5)" }}
         >

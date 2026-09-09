@@ -1,17 +1,14 @@
 import { Outlet, useNavigate, useLocation } from "react-router";
-import { LayoutDashboard, Target, Zap, Trophy, Settings, Brain } from "lucide-react";
+import { Target, Zap, Settings, Brain } from "lucide-react";
 import { motion } from "motion/react";
 import { useAIEngine } from "./ai-engine-context";
 import { AINotificationOverlay } from "./ai-notification-overlay";
-import { useLocalData } from "./local-data-context";
 import { ProdigyMark } from "./prodigy-mark";
 
 const navItems = [
-  { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/tasks", icon: Target, label: "Tasks" },
   { path: "/focus", icon: Zap, label: "Focus" },
   { path: "/ai", icon: Brain, label: "AI Assistant", highlight: true },
-  { path: "/progress", icon: Trophy, label: "Progress" },
   { path: "/settings", icon: Settings, label: "Settings" }
 ];
 
@@ -19,9 +16,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { insights, isAnalyzing } = useAIEngine();
-  const { stats } = useLocalData();
   const urgentCount = insights.filter(i => !i.dismissed && (i.priority === "urgent" || i.priority === "high")).length;
-  const xpIntoLevel = stats.xp % 500;
 
   return (
     <div className="flex h-screen bg-background dark">
@@ -33,7 +28,7 @@ export function AppLayout() {
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <ProdigyMark size={30} className="shrink-0 text-foreground" />
-            <h2 className="hidden lg:block font-bold text-xl tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h2 className="hidden lg:block font-bold text-xl tracking-tight text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               prodigy
             </h2>
           </div>
@@ -80,25 +75,6 @@ export function AppLayout() {
             );
           })}
         </nav>
-
-        <div className="p-4 border-t border-border">
-          <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 via-accent/10 to-primary/10 border border-primary/20">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="size-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-                <ProdigyMark size={20} blink className="text-white" />
-              </div>
-              <div className="hidden lg:block flex-1 min-w-0">
-                <h4 className="font-medium truncate">You</h4>
-                <p className="text-xs text-muted-foreground">Level {stats.level} · {stats.xp.toLocaleString()} XP</p>
-              </div>
-            </div>
-            <div className="hidden lg:block">
-              <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: `${(xpIntoLevel / 500) * 100}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
       </motion.aside>
 
       <main className="flex-1 overflow-auto">

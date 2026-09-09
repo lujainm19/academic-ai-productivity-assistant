@@ -1,25 +1,20 @@
 // focus-widgets.tsx
 // Each widget renders with its own "material" (photo looks like a photo,
-// a note looks like paper, the timer isn't even a widget — it's typography
-// floating on the canvas) instead of one uniform card component repeated
-// eight times. That's the main thing that keeps this from reading as a
-// dashboard. Color reads from focus-palette.ts's CSS custom properties
-// (--fx-fg, --fx-surface, etc.) rather than hardcoded white/black, so the
-// same widget looks correct on the light "Cream" theme and every dark one.
+// a note looks like paper, the timer isn't even a widget, it's typography
+// floating on the canvas) instead of one uniform card component repeated.
+// That's the main thing that keeps this from reading as a dashboard. Color
+// reads from focus-palette.ts's CSS custom properties (--fx-fg, --fx-surface,
+// etc.) rather than hardcoded white/black, so the same widget looks correct
+// on the light "Cream" theme and every dark one.
+//
+// Spotify, Google Calendar, and Canvas widgets used to live here too;
+// removed so the canvas only offers things that work fully offline.
 
 import { motion, useMotionValue } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
-import { X, GripVertical, Music2, CalendarDays, Link2, Camera, Play, Pause, SkipForward, LogOut } from "lucide-react";
+import { X, GripVertical, Camera } from "lucide-react";
 import { useLocalData } from "./local-data-context";
 import { CanvasWidget, WidgetSize, WIDGET_DIMENSIONS, useFocusCanvas } from "./focus-canvas-context";
-import { useAppAuth } from "./app-auth-context";
-
-// Every call to our own /api/integrations/* or /api/auth/* needs
-// credentials so the HttpOnly session cookie actually travels with it —
-// fetch doesn't send cookies by default for anything but same-origin
-// simple requests, and this app talks to a separate backend origin in
-// production.
-const withCreds: RequestInit = { credentials: "include" };
 
 const NOTE_COLORS: Record<string, { bg: string; text: string }> = {
   amber: { bg: "#3a301c", text: "#f0dcae" },
@@ -333,250 +328,6 @@ export function PhotoWidget({ widget }: { widget: CanvasWidget }) {
   );
 }
 
-// ── Shared shell for the three "connect" widgets — same material so they
-// read as one family, distinct from notes/photos/tasks. ───────────────────
-function ConnectShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full h-full rounded-xl p-3.5 flex flex-col justify-center gap-1.5" style={{ background: "var(--fx-connect-surface)", border: "1px solid var(--fx-border)" }}>
-      {children}
-    </div>
-  );
-}
-
-export function CanvasDeadlineWidget() {
-  const [state, setState] = useState<"loading" | "connected" | "unconfigured">("loading");
-  const [assignment, setAssignment] = useState<{ title: string; courseName: string; due: string } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const health = await fetch("/api/health").then(r => r.json());
-        if (!health.canvasConfigured) { if (!cancelled) setState("unconfigured"); return; }
-        const assignments = await fetch("/api/canvas/assignments").then(r => r.json());
-        const next = Array.isArray(assignments)
-          ? assignments.filter((a: any) => a.due && new Date(a.due) > new Date()).sort((a: any, b: any) => +new Date(a.due) - +new Date(b.due))[0]
-          : null;
-        if (!cancelled) {
-          if (next) { setAssignment({ title: next.title, courseName: next.courseName, due: next.due }); setState("connected"); }
-          else setState("unconfigured");
-        }
-      } catch {
-        if (!cancelled) setState("unconfigured");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  if (state !== "connected") {
-    return (
-      <ConnectShell>
-        <Link2 className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-        <p className="text-[13px] font-medium" style={{ color: "var(--fx-fg)" }}>Connect Canvas</p>
-        <p className="text-[11px] leading-snug" style={{ color: "var(--fx-fg-muted)" }}>Keep your upcoming assignments within reach.</p>
-      </ConnectShell>
-    );
-  }
-
-  const daysLeft = Math.max(0, Math.ceil((+new Date(assignment!.due) - Date.now()) / 86400000));
-  return (
-    <ConnectShell>
-      <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--fx-fg-muted)" }}>{assignment!.courseName}</p>
-      <p className="text-[13.5px] font-medium truncate" style={{ color: "var(--fx-fg)" }}>{assignment!.title}</p>
-      <p className="text-[11px] text-amber-500">due in {daysLeft} day{daysLeft === 1 ? "" : "s"}</p>
-    </ConnectShell>
-  );
-}
-
-// Spotify — real user-scoped OAuth (see server/routes/spotify.js). The app
-// itself must know who's asking before "Connect" means anything, so an
-// app account (see app-auth-context.tsx) is required first — that's what
-// requireSignIn gates. "Connect" then opens Spotify's own consent screen
-// in a popup, scoped to *this* app-user by the backend's one-time `state`
-// value, never a client-supplied id.
-export function SpotifyWidget() {
-  const { user, requireSignIn } = useAppAuth();
-  const [state, setState] = useState<"loading" | "unconfigured" | "disconnected" | "connected">("loading");
-  const [track, setTrack] = useState<{ title: string; artist: string; albumArt?: string; isPlaying: boolean } | null>(null);
-
-  const refresh = async () => {
-    try {
-      const health = await fetch("/api/health").then(r => r.json());
-      if (!health.spotifyConfigured) { setState("unconfigured"); return; }
-      if (!user) { setState("disconnected"); return; }
-      const res = await fetch("/api/integrations/spotify/now-playing", withCreds);
-      if (res.status === 401) { setState("disconnected"); return; }
-      const data = await res.json();
-      setState("connected");
-      setTrack(data.track ?? null);
-    } catch {
-      setState("unconfigured");
-    }
-  };
-
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 15000); // polled, not per-render — see server/lib/spotifyClient.js rate-limit handling
-    return () => clearInterval(t);
-  }, [user]);
-
-  const connect = () => requireSignIn(() => {
-    const w = window.open("/api/integrations/spotify/connect", "spotify-connect", "width=480,height=680");
-    const poll = setInterval(() => {
-      if (w?.closed) { clearInterval(poll); refresh(); }
-    }, 600);
-  });
-
-  const disconnect = async () => {
-    await fetch("/api/integrations/spotify/disconnect", { method: "POST", ...withCreds });
-    refresh();
-  };
-
-  const control = async (action: "play" | "pause" | "next") => {
-    await fetch(`/api/integrations/spotify/${action}`, { method: "POST", ...withCreds });
-    setTimeout(refresh, 400);
-  };
-
-  if (state === "unconfigured") {
-    return (
-      <ConnectShell>
-        <Music2 className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-        <p className="text-[13px] font-medium" style={{ color: "var(--fx-fg)" }}>Spotify not set up</p>
-        <p className="text-[11px] leading-snug" style={{ color: "var(--fx-fg-muted)" }}>Add Spotify credentials to server/.env first.</p>
-      </ConnectShell>
-    );
-  }
-
-  if (state === "disconnected") {
-    return (
-      <button onClick={connect} className="block w-full h-full text-left">
-        <ConnectShell>
-          <Music2 className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-          <p className="text-[13px] font-medium" style={{ color: "var(--fx-fg)" }}>Connect Spotify</p>
-          <p className="text-[11px] leading-snug" style={{ color: "var(--fx-fg-muted)" }}>Bring your music into your focus space.</p>
-        </ConnectShell>
-      </button>
-    );
-  }
-
-  if (!track) {
-    return (
-      <ConnectShell>
-        <Music2 className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-        <p className="text-[12.5px]" style={{ color: "var(--fx-fg-muted)" }}>Nothing playing right now.</p>
-      </ConnectShell>
-    );
-  }
-
-  return (
-    <div className="w-full h-full rounded-xl p-3 flex items-center gap-3 group/w" style={{ background: "var(--fx-connect-surface)", border: "1px solid var(--fx-border)" }}>
-      {track.albumArt
-        ? <img src={track.albumArt} alt="" className="size-11 rounded-lg object-cover shrink-0" />
-        : <div className="size-11 rounded-lg shrink-0 flex items-center justify-center" style={{ background: "var(--fx-surface)" }}><Music2 className="size-4" style={{ color: "var(--fx-fg-faint)" }} /></div>}
-      <div className="min-w-0 flex-1">
-        <p className="text-[12.5px] font-medium truncate" style={{ color: "var(--fx-fg)" }}>{track.title}</p>
-        <p className="text-[11px] truncate" style={{ color: "var(--fx-fg-muted)" }}>{track.artist}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <button onClick={() => control(track.isPlaying ? "pause" : "play")} aria-label={track.isPlaying ? "Pause" : "Play"}>
-            {track.isPlaying ? <Pause className="size-3.5" style={{ color: "var(--fx-fg)" }} /> : <Play className="size-3.5" style={{ color: "var(--fx-fg)" }} />}
-          </button>
-          <button onClick={() => control("next")} aria-label="Skip">
-            <SkipForward className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-          </button>
-        </div>
-      </div>
-      <button onClick={disconnect} aria-label="Disconnect Spotify" className="opacity-0 group-hover/w:opacity-60 hover:!opacity-100 transition-opacity shrink-0">
-        <LogOut className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-      </button>
-    </div>
-  );
-}
-
-// Google Calendar — same user-scoped OAuth pattern as Spotify above.
-export function CalendarConnectWidget() {
-  const { user, requireSignIn } = useAppAuth();
-  const [state, setState] = useState<"loading" | "unconfigured" | "disconnected" | "connected">("loading");
-  const [event, setEvent] = useState<{ title: string; startTime: string } | null>(null);
-
-  const refresh = async () => {
-    try {
-      const health = await fetch("/api/health").then(r => r.json());
-      if (!health.calendarConfigured) { setState("unconfigured"); return; }
-      if (!user) { setState("disconnected"); return; }
-      const res = await fetch("/api/integrations/google/calendar", withCreds);
-      if (res.status === 401) { setState("disconnected"); return; }
-      const data = await res.json();
-      setState("connected");
-      setEvent(data.events?.[0] ?? null);
-    } catch {
-      setState("unconfigured");
-    }
-  };
-
-  useEffect(() => { refresh(); }, [user]);
-
-  const connect = () => requireSignIn(() => {
-    const w = window.open("/api/integrations/google/connect", "google-connect", "width=480,height=680");
-    const poll = setInterval(() => {
-      if (w?.closed) { clearInterval(poll); refresh(); }
-    }, 600);
-  });
-
-  const disconnect = async () => {
-    await fetch("/api/integrations/google/disconnect", { method: "POST", ...withCreds });
-    refresh();
-  };
-
-  if (state === "unconfigured") {
-    return (
-      <ConnectShell>
-        <CalendarDays className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-        <p className="text-[13px] font-medium" style={{ color: "var(--fx-fg)" }}>Calendar not set up</p>
-        <p className="text-[11px] leading-snug" style={{ color: "var(--fx-fg-muted)" }}>Add Google credentials to server/.env first.</p>
-      </ConnectShell>
-    );
-  }
-
-  if (state === "disconnected") {
-    return (
-      <button onClick={connect} className="block w-full h-full text-left">
-        <ConnectShell>
-          <CalendarDays className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-          <p className="text-[13px] font-medium" style={{ color: "var(--fx-fg)" }}>Connect Google Calendar</p>
-          <p className="text-[11px] leading-snug" style={{ color: "var(--fx-fg-muted)" }}>See what's coming up without leaving your focus space.</p>
-        </ConnectShell>
-      </button>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="w-full h-full rounded-xl p-3.5 flex items-center justify-between gap-2 group/w" style={{ background: "var(--fx-connect-surface)", border: "1px solid var(--fx-border)" }}>
-        <div className="flex flex-col gap-1.5">
-          <CalendarDays className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-          <p className="text-[12.5px]" style={{ color: "var(--fx-fg-muted)" }}>Nothing else on today.</p>
-        </div>
-        <button onClick={disconnect} aria-label="Disconnect Google Calendar" className="opacity-0 group-hover/w:opacity-60 hover:!opacity-100 transition-opacity shrink-0">
-          <LogOut className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full h-full rounded-xl p-3.5 flex items-start justify-between gap-2 group/w" style={{ background: "var(--fx-connect-surface)", border: "1px solid var(--fx-border)" }}>
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--fx-fg-muted)" }}>Next up</p>
-        <p className="text-[13.5px] font-medium truncate" style={{ color: "var(--fx-fg)" }}>{event.title}</p>
-        <p className="text-[11px]" style={{ color: "var(--fx-fg-muted)" }}>{new Date(event.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
-      </div>
-      <button onClick={disconnect} aria-label="Disconnect Google Calendar" className="opacity-0 group-hover/w:opacity-60 hover:!opacity-100 transition-opacity shrink-0">
-        <LogOut className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
-      </button>
-    </div>
-  );
-}
-
 export function renderWidgetBody(widget: CanvasWidget) {
   switch (widget.type) {
     case "clock": return <ClockWidget />;
@@ -584,9 +335,6 @@ export function renderWidgetBody(widget: CanvasWidget) {
     case "growth": return <GrowthWidget widget={widget} />;
     case "note": return <NoteWidget widget={widget} />;
     case "photo": return <PhotoWidget widget={widget} />;
-    case "canvas": return <CanvasDeadlineWidget />;
-    case "spotify": return <SpotifyWidget />;
-    case "calendar": return <CalendarConnectWidget />;
     default: return null;
   }
 }

@@ -255,27 +255,39 @@ export function SettingsPage() {
             />
             <div className="flex items-center justify-between gap-4 px-4 py-3.5">
               <p className="text-sm font-medium">Focus duration</p>
-              <select
-                value={settings.focusDuration}
-                onChange={e => setFocusDuration(e.target.value as any)}
-                className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary"
-              >
-                <option value="15">15 minutes</option>
-                <option value="25">25 minutes</option>
-                <option value="50">50 minutes</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={settings.focusDuration}
+                  onChange={e => setFocusDuration(e.target.value)}
+                  onBlur={e => {
+                    const n = Math.min(180, Math.max(5, Math.round(Number(e.target.value)) || 25));
+                    setFocusDuration(String(n));
+                  }}
+                  className="w-16 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary text-right"
+                />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </div>
             </div>
             <div className="flex items-center justify-between gap-4 px-4 py-3.5">
               <p className="text-sm font-medium">Break duration</p>
-              <select
-                value={settings.breakDuration}
-                onChange={e => setBreakDuration(e.target.value as any)}
-                className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary"
-              >
-                <option value="5">5 minutes</option>
-                <option value="10">10 minutes</option>
-                <option value="15">15 minutes</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={settings.breakDuration}
+                  onChange={e => setBreakDuration(e.target.value)}
+                  onBlur={e => {
+                    const n = Math.min(60, Math.max(1, Math.round(Number(e.target.value)) || 5));
+                    setBreakDuration(String(n));
+                  }}
+                  className="w-16 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary text-right"
+                />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </div>
             </div>
           </div>
 

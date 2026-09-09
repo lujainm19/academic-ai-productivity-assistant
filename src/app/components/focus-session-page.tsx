@@ -1,14 +1,17 @@
 // focus-session-page.tsx
 // A personal focus canvas, not a Pomodoro dashboard: a fixed timer anchors
 // the center, and the user arranges their own widgets (photos, notes,
-// tasks, music/calendar/Canvas connect-states) freely around it. Layout
-// persists via focus-canvas-context.tsx (localStorage, same pattern as the
-// rest of the app's data layer — see that file for why). Color comes from
+// tasks) freely around it. Session length, break length, and break
+// reminders are editable right here too, via the timer icon next to the
+// background picker, same popover material, so nothing about how a
+// session runs requires a trip to Settings. Layout persists via
+// focus-canvas-context.tsx (localStorage, same pattern as the rest of the
+// app's data layer, see that file for why). Color comes from
 // focus-palette.ts's CSS custom properties, not hardcoded white/black, so
 // the light "Cream" theme and the dark ones share the same markup.
 
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, Play, Pause, RotateCcw, LayoutGrid, Plus, X, Check } from "lucide-react";
+import { ChevronLeft, Play, Pause, RotateCcw, LayoutGrid, Plus, X, Check, Minus, Bell, BellOff } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useLocalData } from "./local-data-context";
@@ -19,6 +22,62 @@ import {
 import { WidgetFrame, renderWidgetBody } from "./focus-widgets";
 import { BACKGROUNDS, paletteVars } from "./focus-palette";
 import { ProdigyMark } from "./prodigy-mark";
+
+// A free-form minute stepper, not a fixed set of presets — nudge with
+// +/- or type any value directly. Clamped to [min, max] so the timer
+// itself can't be broken (0 minutes, a negative value, multi-day
+// "sessions"), everything inside that range is fair game.
+function DurationStepper({
+  value, onChange, min, max, step,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
+  const commit = (raw: string) => {
+    const parsed = Math.round(Number(raw));
+    const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
+    setText(String(next));
+    if (next !== value) onChange(next);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => commit(String(value - step))}
+        className="size-6 rounded-full flex items-center justify-center shrink-0 transition-colors"
+        style={{ background: "var(--fx-surface)", color: "var(--fx-fg-muted)" }}
+        aria-label="Decrease"
+      >
+        <Minus className="size-3" />
+      </button>
+      <input
+        value={text}
+        onChange={e => setText(e.target.value.replace(/[^0-9]/g, ""))}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        inputMode="numeric"
+        className="w-9 text-center text-xs font-medium bg-transparent outline-none"
+        style={{ color: "var(--fx-fg)" }}
+        aria-label="Minutes"
+      />
+      <span className="text-[10px] mr-0.5" style={{ color: "var(--fx-fg-faint)" }}>min</span>
+      <button
+        onClick={() => commit(String(value + step))}
+        className="size-6 rounded-full flex items-center justify-center shrink-0 transition-colors"
+        style={{ background: "var(--fx-surface)", color: "var(--fx-fg-muted)" }}
+        aria-label="Increase"
+      >
+        <Plus className="size-3" />
+      </button>
+    </div>
+  );
+}
 
 function playChime() {
   try {
@@ -42,7 +101,7 @@ function playChime() {
 export function FocusSessionPage() {
   const navigate = useNavigate();
   const { tasks } = useLocalData();
-  const { savedSettings } = useCustomization();
+  const { savedSettings, applyNow } = useCustomization();
   const canvas = useFocusCanvas();
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +116,12 @@ export function FocusSessionPage() {
   const [showAddTray, setShowAddTray] = useState(false);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  // Session length: a minus/plus pair flanking the digits (always visible,
+  // 1-minute steps, no presets) plus click-the-digits-to-type-a-value —
+  // both are "the real number," never a menu about it. Break length gets
+  // its own small stepper under the controls instead of sharing this row.
+  const [editingMinutes, setEditingMinutes] = useState(false);
+  const [minutesText, setMinutesText] = useState("");
 
   useEffect(() => {
     // 760, not 880/1024 — a free-form drag canvas still works fine on a
@@ -102,6 +167,22 @@ export function FocusSessionPage() {
     setShowAddTray(false);
   };
 
+  const adjustFocus = (delta: number) => {
+    applyNow({ focusDuration: String(Math.min(180, Math.max(5, focusMins + delta))) });
+  };
+
+  const startEditingMinutes = () => {
+    setMinutesText(String(focusMins));
+    setEditingMinutes(true);
+  };
+
+  const commitMinutesEdit = () => {
+    const parsed = Math.round(Number(minutesText));
+    const n = Number.isFinite(parsed) ? Math.min(180, Math.max(5, parsed)) : focusMins;
+    if (n !== focusMins) applyNow({ focusDuration: String(n) });
+    setEditingMinutes(false);
+  };
+
   return (
     <div
       className="relative min-h-screen overflow-hidden"
@@ -110,7 +191,7 @@ export function FocusSessionPage() {
       <div className="relative z-10 min-h-screen flex flex-col">
 
         <nav className="flex items-center justify-between p-5 md:p-7">
-          <button onClick={() => navigate("/dashboard")} className="size-9 rounded-full flex items-center justify-center transition-colors" style={{ background: "var(--fx-surface)" }} aria-label="Back">
+          <button onClick={() => navigate("/tasks")} className="size-9 rounded-full flex items-center justify-center transition-colors" style={{ background: "var(--fx-surface)" }} aria-label="Back">
             <ChevronLeft className="size-4.5" style={{ color: "var(--fx-fg-muted)" }} />
           </button>
 
@@ -172,21 +253,77 @@ export function FocusSessionPage() {
             <p className="text-[11px] uppercase tracking-[0.14em] mb-3" style={{ color: "var(--fx-fg-faint)" }}>
               {mode === "focus" ? `Session ${sessionCount + 1}` : "Break"}
             </p>
-            <div className="relative">
-              <p
-                className="tabular-nums leading-none"
-                style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(4.5rem, 13vw, 8.5rem)", fontWeight: 400, fontVariationSettings: "'opsz' 90", color: "var(--fx-fg)" }}
-              >
-                {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-              </p>
-              <div className="h-[3px] rounded-full mt-2 overflow-hidden" style={{ width: "min(60vw, 280px)", background: "var(--fx-track)" }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: "var(--fx-fg)" }}
-                  animate={{ width: `${progress * 100}%` }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                />
+            <div className="flex items-center gap-3 md:gap-4">
+              {editMode && mode === "focus" && (
+                <button
+                  onClick={() => adjustFocus(-1)}
+                  className="pointer-events-auto size-9 rounded-full flex items-center justify-center transition-colors shrink-0"
+                  style={{ background: "var(--fx-surface)" }}
+                  aria-label="Decrease session length by 1 minute"
+                >
+                  <Minus className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
+                </button>
+              )}
+
+              <div className="relative">
+                {editingMinutes ? (
+                  <div
+                    className="flex items-center justify-center tabular-nums leading-none pointer-events-auto"
+                    style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(4.5rem, 13vw, 8.5rem)", fontWeight: 400, fontVariationSettings: "'opsz' 90", color: "var(--fx-fg)" }}
+                  >
+                    <input
+                      autoFocus
+                      value={minutesText}
+                      onChange={e => setMinutesText(e.target.value.replace(/[^0-9]/g, ""))}
+                      onFocus={e => e.currentTarget.select()}
+                      onBlur={commitMinutesEdit}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape") setEditingMinutes(false);
+                      }}
+                      inputMode="numeric"
+                      aria-label="Session length in minutes"
+                      className="bg-transparent outline-none text-right tabular-nums"
+                      style={{ font: "inherit", color: "inherit", width: "2.1ch" }}
+                    />
+                    <span>:00</span>
+                  </div>
+                ) : (
+                  <p
+                    className={`tabular-nums leading-none transition-opacity ${editMode && mode === "focus" ? "pointer-events-auto cursor-text hover:opacity-80" : ""}`}
+                    style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(4.5rem, 13vw, 8.5rem)", fontWeight: 400, fontVariationSettings: "'opsz' 90", color: "var(--fx-fg)" }}
+                    onClick={editMode && mode === "focus" ? startEditingMinutes : undefined}
+                    title={editMode && mode === "focus" ? "Click to type an exact session length" : undefined}
+                  >
+                    {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                  </p>
+                )}
+                {/* Width was a hardcoded "min(60vw, 280px)" — unrelated to the
+                    digits' own clamp()-driven font size, so at most viewport
+                    widths it fell short of the actual text. This wrapper is
+                    content-sized (flex item under items-center, not
+                    stretched), so 100% here always matches whichever child
+                    is wider, i.e. the digits themselves. */}
+                <div className="h-[3px] rounded-full mt-2 overflow-hidden w-full" style={{ background: "var(--fx-track)" }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: "var(--fx-fg)" }}
+                    animate={{ width: `${progress * 100}%` }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  />
+                </div>
               </div>
+
+              {editMode && mode === "focus" && (
+                <button
+                  onClick={() => adjustFocus(1)}
+                  className="pointer-events-auto size-9 rounded-full flex items-center justify-center transition-colors shrink-0"
+                  style={{ background: "var(--fx-surface)" }}
+                  aria-label="Increase session length by 1 minute"
+                >
+                  <Plus className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
+                </button>
+              )}
             </div>
             {currentTask && mode === "focus" && (
               <p className="text-sm mt-5" style={{ color: "var(--fx-fg-muted)" }}>{currentTask.title}</p>
@@ -208,6 +345,34 @@ export function FocusSessionPage() {
               </button>
               <div className="size-10" />
             </div>
+
+            {/* Break length, underneath — its own small stepper, separate
+                from the session-length row above since it's a different
+                number for a different phase of the session. Only in
+                Customize mode, same rule as the session-length controls
+                and every widget's own edit chrome. */}
+            {editMode && mode === "focus" && (
+              <div className="flex items-center gap-3 mt-4 pointer-events-auto">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px]" style={{ color: "var(--fx-fg-faint)" }}>break</span>
+                  <DurationStepper
+                    value={breakMins}
+                    onChange={n => applyNow({ breakDuration: String(n) })}
+                    min={1} max={60} step={1}
+                  />
+                </div>
+                <button
+                  onClick={() => applyNow({ breakReminders: !savedSettings.breakReminders })}
+                  className="flex items-center gap-1.5"
+                  aria-label="Toggle break reminders"
+                >
+                  {savedSettings.breakReminders
+                    ? <Bell className="size-3.5" style={{ color: "var(--fx-fg-muted)" }} />
+                    : <BellOff className="size-3.5" style={{ color: "var(--fx-fg-faint)" }} />}
+                  <span className="text-[11px]" style={{ color: "var(--fx-fg-faint)" }}>reminders</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Widgets */}
