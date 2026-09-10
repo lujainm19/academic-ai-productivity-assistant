@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Plus, Calendar, Clock, Zap, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Link2, Flame, ListTodo, Loader2 } from "lucide-react";
-import { useState } from "react";
 import { useAIEngine, canvasCourses } from "./ai-engine-context";
 import { ProdigyMark } from "./prodigy-mark";
+import { useState, useEffect } from "react";
+import { useLocalData } from "./local-data-context";
 
 type Status = "todo" | "in-progress" | "done";
 
@@ -73,6 +74,56 @@ export function TaskPlannerPage() {
   const doneCount = tasks.filter(t => t.status === "done").length;
   const completionPct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
 
+  const { tasks: realTasks, stats } = useLocalData();
+
+// Prodigy suggestion — auto-generated when the page loads
+const [prodígySuggestion, setProdigySuggestion] = useState<string | null>(null);
+const [suggestionLoading, setSuggestionLoading] = useState(true);
+
+useEffect(() => {
+  const getSuggestion = async () => {
+    try {
+      const pendingTasks = realTasks.filter(t => !t.completed);
+      const now = new Date();
+      const taskList = pendingTasks.length > 0
+        ? pendingTasks.map(t => {
+            if (!t.dueDate) return `- ${t.title} (no due date)`;
+            const daysLeft = Math.ceil(
+              (new Date(t.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            const urgency =
+              daysLeft < 0 ? "OVERDUE" :
+              daysLeft === 0 ? "due TODAY" :
+              daysLeft === 1 ? "due TOMORROW" :
+              `due in ${daysLeft} days`;
+            return `- ${t.title} (${urgency}, priority: ${t.priority})`;
+          }).join("\n")
+        : "No pending tasks.";
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Give me one short, specific recommendation for what I should focus on right now. Be direct and practical. Max 2 sentences.",
+          history: [],
+          context: `Current time: ${now.toLocaleString()}. Student stats: ${stats.streak}-day streak, level ${stats.level}. Pending tasks:\n${taskList}`,
+        }),
+      });
+
+      if (res.ok) {
+        const { reply } = await res.json();
+        setProdigySuggestion(reply);
+      }
+    } catch {
+      // silently fail — the card just won't show
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
+
+  getSuggestion();
+}, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-7xl mx-auto space-y-5">
@@ -115,6 +166,34 @@ export function TaskPlannerPage() {
           ))}
         </div>
 
+        {/* Prodigy Suggestion Card — auto-generated on page load */}
+{(suggestionLoading || prodígySuggestion) && (
+  <motion.div
+    initial={{ opacity: 0, y: -10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
+  >
+    <div className="flex items-start gap-3">
+      <div className="size-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+        <ProdigyMark size={16} className="text-primary" />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-semibold">Prodigy suggests</span>
+          <span className="size-2 rounded-full bg-green-500 animate-pulse" />
+        </div>
+        {suggestionLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            Prodigy is analyzing your tasks…
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{prodígySuggestion}</p>
+        )}
+      </div>
+    </div>
+  </motion.div>
+)}
         {/* AI Suggestion Banner */}
         <AnimatePresence>
           {aiInsight && (

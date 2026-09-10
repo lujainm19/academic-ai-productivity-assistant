@@ -78,21 +78,53 @@ export function AIPanelPage() {
   // Build a context string from the student's real tasks so Prodigy
   // gives grounded answers instead of generic ones
   const buildContext = () => {
-    const pendingTasks = tasks.filter(t => !t.completed);
-    const completedCount = tasks.filter(t => t.completed).length;
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const pendingTasks = tasks.filter(t => !t.completed);
+  const completedCount = tasks.filter(t => t.completed).length;
+  const hour = now.getHours();
 
-    const taskList = pendingTasks.length > 0
-      ? pendingTasks
-          .map(t => `- ${t.title} (due: ${t.due}, priority: ${t.priority})`)
-          .join("\n")
-      : "No pending tasks.";
+  // Work out how urgent each task is
+  const taskList = pendingTasks.length > 0
+    ? pendingTasks
+        .map(t => {
+          if (!t.dueDate) return `- ${t.title} (no due date, priority: ${t.priority})`;
+          const daysLeft = Math.ceil(
+            (new Date(t.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          const urgency =
+            daysLeft < 0  ? "OVERDUE" :
+            daysLeft === 0 ? "due TODAY" :
+            daysLeft === 1 ? "due TOMORROW" :
+            `due in ${daysLeft} days`;
+          return `- ${t.title} (${urgency}, priority: ${t.priority})`;
+        })
+        .join("\n")
+    : "No pending tasks.";
 
-    return [
-      `Student stats: Level ${stats.level}, ${stats.xp} XP, ${stats.streak}-day streak, ${completedCount} tasks completed.`,
-      `Pending tasks:\n${taskList}`,
-      `Current time: ${new Date().toLocaleString()}.`,
-    ].join("\n\n");
-  };
+  // Overdue tasks specifically
+  const overdue = pendingTasks.filter(
+    t => t.dueDate && t.dueDate < todayStr
+  );
+
+  // Time of day context so Prodigy can make energy-aware suggestions
+  const timeOfDay =
+    hour < 6  ? "late night" :
+    hour < 12 ? "morning" :
+    hour < 17 ? "afternoon" :
+    hour < 21 ? "evening" :
+                "night";
+
+  return [
+    `Current date and time: ${now.toLocaleString()}, it is ${timeOfDay}.`,
+    `Student stats: ${stats.streak}-day streak, ${stats.xp} XP, level ${stats.level}, ${completedCount} tasks completed total.`,
+    overdue.length > 0
+      ? `⚠️ OVERDUE tasks (${overdue.length}): ${overdue.map(t => t.title).join(", ")}`
+      : null,
+    `Pending tasks (${pendingTasks.length} total):\n${taskList}`,
+    `Use this data to give specific, actionable advice. Reference task names and deadlines directly. If tasks are overdue, address that urgently.`,
+  ].filter(Boolean).join("\n\n");
+};
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
