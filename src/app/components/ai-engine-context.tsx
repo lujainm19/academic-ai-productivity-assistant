@@ -146,7 +146,7 @@ export interface AIEngineState {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // Hours a manually-added task is assumed to need, since (unlike Canvas
 // assignments) it doesn't carry its own estimatedHours.
-const HOURS_PER_TASK = { high: 1.5, medium: 1 } as const;
+const HOURS_PER_TASK = { high: 1.5, medium: 1, low: 0.5 } as const;
 
 // Driven only by the user's real tasks - deliberately ignores the mock
 // canvasCourses/calendarEvents demo data used elsewhere (task-planner-page),

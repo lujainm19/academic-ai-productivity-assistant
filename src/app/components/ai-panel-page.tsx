@@ -169,6 +169,16 @@ export function AIPanelPage() {
     }
   };
 
+  // Builds proactive actions without nesting them inside sendMessage.
+  const planWeek = async () => {
+    await sendMessage(`Based on my current tasks and deadlines, build me a detailed study schedule for the next 7 days. For each day, tell me which task to work on, how long to study, and why you're prioritizing it. Be specific and use the actual task names.`);
+  };
+
+  const actionButtons = [
+    { icon: Calendar, label: "Plan my week", action: planWeek, color: "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20" },
+    { icon: Target, label: "What should I do right now?", action: () => sendMessage("What's the single most important thing I should work on right now and why?"), color: "bg-accent/10 border-accent/30 text-accent hover:bg-accent/20" },
+  ];
+
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
 
@@ -300,6 +310,27 @@ export function AIPanelPage() {
               >
                 <p.icon className="size-3.5 text-primary" />
                 {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Action buttons — proactive Prodigy features */}
+      {messages.length === 0 && (
+        <div className="shrink-0 px-6 pb-2 mt-2">
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+            <Sparkles className="size-3" /> Prodigy can also
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {actionButtons.map((btn, i) => (
+              <button
+                key={i}
+                onClick={btn.action}
+                disabled={isTyping}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium text-sm transition-all ${btn.color}`}
+              >
+                <btn.icon className="size-4" />
+                {btn.label}
               </button>
             ))}
           </div>
