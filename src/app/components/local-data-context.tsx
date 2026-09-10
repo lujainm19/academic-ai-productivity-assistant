@@ -4,12 +4,29 @@ import { toLocalDateStr } from "../lib/date";
 export interface Task {
   id: string;
   title: string;
-  due: string;
-  dueDate: string | null; // ISO yyyy-mm-dd, so downstream logic (workload, insights) can reason about actual dates instead of parsing the display label
-  priority: "high" | "medium";
+  dueDate: string | null; // ISO yyyy-mm-dd, so downstream logic (workload, insights) can reason about actual dates instead of parsing a display label
+  priority: "high" | "medium" | "low";
+  course?: string;
+  courseColor?: string;
+  estimatedHours?: number;
+  // Kanban position while the task is still open. Meaningless once
+  // completed is true — "done" isn't a status value, it's a separate flag,
+  // the same one XP/streak already keys off of, so finishing a task from
+  // the board and finishing it from the Focus canvas's Tasks widget are
+  // the exact same action, not two different completion concepts.
+  status: "todo" | "in-progress";
   completed: boolean;
   completedAt: string | null; // ISO string, so it survives localStorage round-trips
   createdAt: number;
+}
+
+export interface NewTaskInput {
+  title: string;
+  priority: Task["priority"];
+  dueDate: string | null;
+  course?: string;
+  courseColor?: string;
+  estimatedHours?: number;
 }
 
 export interface UserStats {
@@ -30,8 +47,9 @@ export interface Badge {
 interface LocalDataContextValue {
   tasks: Task[];
   stats: UserStats;
-  addTask: (title: string, due: string, priority: "high" | "medium", dueDate?: string | null) => void;
+  addTask: (input: NewTaskInput) => void;
   completeTask: (id: string) => { xpGained: number; isLate: boolean };
+  setTaskStatus: (id: string, status: Task["status"]) => void;
   deleteTask: (id: string) => void;
   pendingBadgeUnlocks: Badge[];
   dismissBadgeUnlock: (id: string) => void;
@@ -148,18 +166,30 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
     setPendingBadgeUnlocks(prev => prev.filter(b => b.id !== id));
   }, []);
 
-  const addTask = (title: string, due: string, priority: "high" | "medium", dueDate: string | null = null) => {
+  const addTask = (input: NewTaskInput) => {
     const task: Task = {
       id: crypto.randomUUID(),
-      title,
-      due,
-      dueDate,
-      priority,
+      title: input.title,
+      dueDate: input.dueDate,
+      priority: input.priority,
+      course: input.course,
+      courseColor: input.courseColor,
+      estimatedHours: input.estimatedHours,
+      status: "todo",
       completed: false,
       completedAt: null,
       createdAt: Date.now(),
     };
     setTasks(prev => [task, ...prev]);
+  };
+
+  // Kanban moves that don't finish the task — "done" is handled by
+  // completeTask instead, since that's the one that actually awards XP
+  // and touches the streak. Moving a task back out of Done un-completes
+  // it (so the board reflects reality) but doesn't claw back XP already
+  // earned; that's a deliberate choice, not an oversight.
+  const setTaskStatus = (id: string, status: Task["status"]) => {
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status, completed: false, completedAt: null } : t)));
   };
 
   const completeTask = (id: string) => {
@@ -202,7 +232,7 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <LocalDataContext.Provider value={{ tasks, stats, addTask, completeTask, deleteTask, pendingBadgeUnlocks, dismissBadgeUnlock, resetProgress }}>
+    <LocalDataContext.Provider value={{ tasks, stats, addTask, completeTask, setTaskStatus, deleteTask, pendingBadgeUnlocks, dismissBadgeUnlock, resetProgress }}>
       {children}
     </LocalDataContext.Provider>
   );
