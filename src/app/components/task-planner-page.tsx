@@ -14,7 +14,7 @@
 
 import { motion, AnimatePresence } from "motion/react";
 import { Plus, Calendar, Clock, Target, Brain, GripVertical, Search, Sparkles, CheckCircle2, ArrowUpDown, AlertCircle, Flame, ListTodo, Loader2, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAIEngine } from "./ai-engine-context";
 import { useLocalData, Task } from "./local-data-context";
 import { ProdigyMark } from "./prodigy-mark";
@@ -61,7 +61,7 @@ function courseColorFor(course: string): string {
 
 export function TaskPlannerPage() {
   const { insights } = useAIEngine();
-  const { tasks, addTask, completeTask, setTaskStatus, deleteTask } = useLocalData();
+  const { tasks, addTask, completeTask, setTaskStatus, deleteTask, stats } = useLocalData();
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [aiSorted, setAiSorted] = useState(false);
@@ -74,6 +74,50 @@ export function TaskPlannerPage() {
   const [newCourse, setNewCourse] = useState("");
   const [newPriority, setNewPriority] = useState<Task["priority"]>("medium");
   const [titleError, setTitleError] = useState(false);
+
+  const [prodigySuggestion, setProdigySuggestion] = useState<string | null>(null);
+
+useEffect(() => {
+  const getSuggestion = async () => {
+    try {
+      const pendingTasks = tasks.filter(t => !t.completed);
+      const now = new Date();
+      const taskList = pendingTasks.length > 0
+        ? pendingTasks.map(t => {
+            if (!t.dueDate) return `- ${t.title} (no due date)`;
+            const daysLeft = Math.ceil(
+              (new Date(t.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            const urgency =
+              daysLeft < 0 ? "OVERDUE" :
+              daysLeft === 0 ? "due TODAY" :
+              daysLeft === 1 ? "due TOMORROW" :
+              `due in ${daysLeft} days`;
+            return `- ${t.title} (${urgency}, priority: ${t.priority})`;
+          }).join("\n")
+        : "No pending tasks.";
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Give me one short, specific recommendation for what I should focus on right now. Be direct and practical. Max 2 sentences.",
+          history: [],
+          context: `Current time: ${now.toLocaleString()}. Student stats: ${stats.streak}-day streak, level ${stats.level}. Pending tasks:\n${taskList}`,
+        }),
+      });
+
+      if (res.ok) {
+        const { reply } = await res.json();
+        setProdigySuggestion(reply);
+      }
+    } catch {
+      // silently fail — falls back to aiInsight.body
+    }
+  };
+
+  getSuggestion();
+}, []);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -118,6 +162,7 @@ export function TaskPlannerPage() {
   const hoursRemaining = openTasks.reduce((sum, t) => sum + (t.estimatedHours ?? 1), 0);
   const doneCount = tasks.filter(t => t.completed).length;
   const completionPct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+
 
   // If a sort was applied, use it to order every column; otherwise fall
   // back to however useLocalData already orders things (newest first).
@@ -165,7 +210,7 @@ export function TaskPlannerPage() {
           ))}
         </div>
 
-        {/* AI Suggestion Banner */}
+        {/* AI Suggestion Banner - Prodigy Suggestion Card*/}
         <AnimatePresence>
           {aiInsight && (
             <motion.div
@@ -181,10 +226,10 @@ export function TaskPlannerPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <ProdigyMark size={16} className="text-primary" />
-                    <span className="text-sm font-semibold">AI Recommendation</span>
+                    <span className="text-sm font-semibold">Prodigy suggests</span>
                     <span className="text-xs text-muted-foreground">· {aiInsight.confidence}% confidence</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{aiInsight.body}</p>
+                  <p className="text-sm text-muted-foreground">{prodigySuggestion ?? aiInsight.body}</p>
                 </div>
                 {!aiSorted && (
                   <button
@@ -284,7 +329,7 @@ export function TaskPlannerPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, height: 0 }}
                         draggable
-                        onDragStart={e => { e.dataTransfer.setData("text/plain", task.id); setDraggingId(task.id); }}
+                        onDragStart={e => { (e as unknown as DragEvent).dataTransfer?.setData("text/plain", task.id); setDraggingId(task.id); }}
                         onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
                         className={`group p-4 rounded-xl bg-card border transition-all cursor-grab active:cursor-grabbing ${
                           draggingId === task.id ? "opacity-40" : "opacity-100"

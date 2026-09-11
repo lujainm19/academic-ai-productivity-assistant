@@ -7,14 +7,13 @@
 //
 // Sections: Account (the one genuinely new thing here — Spotify/Calendar
 // connection used to be buried inside a Focus widget, which isn't where
-// anyone thinks to manage a login), Appearance, Focus defaults, and Your
-// data. Account and Your data act immediately; Appearance and Focus
-// defaults stay on the existing draft/Save Changes pattern since that's
-// how the rest of the app expects to read them.
+// anyone thinks to manage a login), Appearance, and Your data.
+// Account and Your data act immediately; Appearance stays on the existing
+// theme selection pattern.
 
 import { motion } from "motion/react";
 import {
-  Palette, Bell, Check, LogOut, Music2, CalendarDays, Link2,
+  Check, LogOut, Music2, CalendarDays,
   Download, RotateCcw, Trash2, User as UserIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -65,14 +64,6 @@ function Row({
       </div>
       <div className="shrink-0">{action}</div>
     </div>
-  );
-}
-
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className={`w-11 h-6 rounded-full transition-colors relative ${on ? "bg-primary" : "bg-secondary"}`}>
-      <span className={`absolute top-1 size-4 rounded-full bg-white transition-all ${on ? "left-6" : "left-1"}`} />
-    </button>
   );
 }
 
@@ -128,10 +119,7 @@ function IntegrationRow({
 }
 
 export function SettingsPage() {
-  const {
-    settings, setTheme, setBreakReminders, setFocusDuration, setBreakDuration,
-    saveChanges, resetToDefault, hasUnsavedChanges,
-  } = useCustomization();
+  const { settings, setTheme } = useCustomization();
   const { tasks, stats, resetProgress } = useLocalData();
   const { widgets, background, resetCanvas } = useFocusCanvas();
   const { user, loading, logout, requireSignIn } = useAppAuth();
@@ -243,66 +231,6 @@ export function SettingsPage() {
                 </button>
               );
             })}
-          </div>
-        </Section>
-
-        {/* ── Focus defaults ─────────────────────────────────────────── */}
-        <Section title="Focus defaults" hint="what a new focus session starts with.">
-          <div className="rounded-xl border border-border divide-y divide-border overflow-hidden py-1">
-            <Row
-              icon={Bell} title="Break reminders" subtitle="a nudge 5 minutes before your break"
-              action={<Toggle on={settings.breakReminders} onClick={() => setBreakReminders(!settings.breakReminders)} />}
-            />
-            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
-              <p className="text-sm font-medium">Focus duration</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={5}
-                  max={180}
-                  value={settings.focusDuration}
-                  onChange={e => setFocusDuration(e.target.value)}
-                  onBlur={e => {
-                    const n = Math.min(180, Math.max(5, Math.round(Number(e.target.value)) || 25));
-                    setFocusDuration(String(n));
-                  }}
-                  className="w-16 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary text-right"
-                />
-                <span className="text-sm text-muted-foreground">minutes</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
-              <p className="text-sm font-medium">Break duration</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={settings.breakDuration}
-                  onChange={e => setBreakDuration(e.target.value)}
-                  onBlur={e => {
-                    const n = Math.min(60, Math.max(1, Math.round(Number(e.target.value)) || 5));
-                    setBreakDuration(String(n));
-                  }}
-                  className="w-16 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary text-right"
-                />
-                <span className="text-sm text-muted-foreground">minutes</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 mt-5">
-            {hasUnsavedChanges && <span className="text-xs text-muted-foreground mr-auto">unsaved changes</span>}
-            <button onClick={resetToDefault} className="text-sm px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors">
-              reset to default
-            </button>
-            <button
-              onClick={saveChanges}
-              disabled={!hasUnsavedChanges}
-              className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              save changes
-            </button>
           </div>
         </Section>
 
