@@ -1,7 +1,6 @@
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { X, ChevronRight, Sparkles, AlertCircle, TrendingUp, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useAIEngine, type AIInsight } from "./ai-engine-context";
+import { type AIInsight } from "./ai-engine-context";
 import { useNavigate } from "react-router";
 import { ProdigyMark } from "./prodigy-mark";
 
@@ -92,67 +91,11 @@ function NotificationCard({ insight, onDismiss }: { insight: AIInsight; onDismis
   );
 }
 
+// Disabled — the drip-feed toast queue below was judged too noisy/distracting
+// in practice and turned off, kept here (unreachable, past the early return)
+// in case the notification design comes back later rather than being
+// rewritten from scratch. Its "analyzing" indicator referenced a fake
+// timer-driven status that's since been removed for real everywhere else.
 export function AINotificationOverlay() {
   return null;
-  const { insights, dismissInsight, isAnalyzing } = useAIEngine();
-  const [queue, setQueue] = useState<AIInsight[]>([]);
-  const [shown, setShown] = useState<Set<string>>(new Set());
-
-  // Drip-feed urgent/high insights as notifications
-  useEffect(() => {
-    const unseen = insights.filter(
-      ins => !ins.dismissed && !shown.has(ins.id) && (ins.priority === "urgent" || ins.priority === "high")
-    );
-    if (unseen.length === 0) return;
-
-    let delay = 1500;
-    unseen.forEach(ins => {
-      setTimeout(() => {
-        setQueue(prev => {
-          if (prev.find(q => q.id === ins.id)) return prev;
-          return [...prev.slice(-2), ins]; // max 3 at once
-        });
-        setShown(prev => new Set([...prev, ins.id]));
-
-        // Auto-dismiss after 8 seconds
-        setTimeout(() => {
-          setQueue(prev => prev.filter(q => q.id !== ins.id));
-        }, 8000);
-      }, delay);
-      delay += 3000;
-    });
-  }, [insights]);
-
-  const handleDismiss = (id: string) => {
-    setQueue(prev => prev.filter(q => q.id !== id));
-    dismissInsight(id);
-  };
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 items-end pointer-events-none">
-      {/* Analyzing indicator */}
-      <AnimatePresence>
-        {isAnalyzing && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-xl border border-primary/30 shadow-lg shadow-primary/10"
-          >
-            <div className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <span className="text-xs text-primary font-medium">AI re-analyzing schedule...</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Notification cards */}
-      <div className="flex flex-col gap-3 items-end pointer-events-auto">
-        <AnimatePresence>
-          {queue.map(insight => (
-            <NotificationCard key={insight.id} insight={insight} onDismiss={() => handleDismiss(insight.id)} />
-          ))}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
 }

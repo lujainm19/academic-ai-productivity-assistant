@@ -15,7 +15,7 @@ const navItems = [
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { insights, isAnalyzing } = useAIEngine();
+  const { insights } = useAIEngine();
   const urgentCount = insights.filter(i => !i.dismissed && (i.priority === "urgent" || i.priority === "high")).length;
 
   return (
@@ -31,16 +31,6 @@ export function AppLayout() {
             <h2 className="hidden lg:block font-bold text-xl tracking-tight text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               prodigy
             </h2>
-          </div>
-        </div>
-
-        {/* AI Status Strip */}
-        <div className="hidden lg:block px-4 py-3 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <div className={`size-2 rounded-full ${isAnalyzing ? "bg-amber-500 animate-pulse" : "bg-green-500"}`} />
-            <span className="text-xs text-muted-foreground">
-              {isAnalyzing ? "AI analyzing..." : "AI active · monitoring"}
-            </span>
           </div>
         </div>
 
@@ -62,7 +52,7 @@ export function AppLayout() {
                 }`}
               >
                 <item.icon className="size-5 shrink-0" />
-                <span className="hidden lg:block font-medium">{item.label}</span>
+                <span className="hidden lg:block font-medium text-left">{item.label}</span>
                 {item.highlight && urgentCount > 0 && !isActive && (
                   <span className="hidden lg:flex ml-auto size-5 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center">
                     {urgentCount}

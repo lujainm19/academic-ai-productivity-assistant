@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { useLocalData, Task } from "./local-data-context";
 import { toLocalDateStr } from "../lib/date";
 
@@ -137,10 +137,6 @@ export interface AIEngineState {
   // Actions
   dismissInsight: (id: string) => void;
   acceptSuggestion: (id: string) => void;
-  triggerRescan: () => void;
-  // State
-  isAnalyzing: boolean;
-  lastAnalyzed: Date;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -332,8 +328,6 @@ const AIEngineContext = createContext<AIEngineState | null>(null);
 export function AIEngineProvider({ children }: { children: ReactNode }) {
   const { tasks } = useLocalData();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [lastAnalyzed, setLastAnalyzed] = useState(new Date());
 
   // Recomputed whenever tasks change, so the suggestions box and week-ahead
   // workload stay in sync with whatever the user has actually added.
@@ -372,26 +366,6 @@ export function AIEngineProvider({ children }: { children: ReactNode }) {
     setDismissedIds(prev => new Set(prev).add(id));
   }, []);
 
-  const triggerRescan = useCallback(() => {
-    setIsAnalyzing(true);
-    setTimeout(() => {
-      setIsAnalyzing(false);
-      setLastAnalyzed(new Date());
-    }, 2200);
-  }, []);
-
-  // Simulate periodic re-analysis
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsAnalyzing(true);
-      setTimeout(() => {
-        setIsAnalyzing(false);
-        setLastAnalyzed(new Date());
-      }, 1500);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <AIEngineContext.Provider value={{
       insights,
@@ -404,9 +378,6 @@ export function AIEngineProvider({ children }: { children: ReactNode }) {
       agentActionLog,
       dismissInsight,
       acceptSuggestion,
-      triggerRescan,
-      isAnalyzing,
-      lastAnalyzed,
     }}>
       {children}
     </AIEngineContext.Provider>

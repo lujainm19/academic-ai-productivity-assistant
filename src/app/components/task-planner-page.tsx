@@ -60,7 +60,7 @@ function courseColorFor(course: string): string {
 }
 
 export function TaskPlannerPage() {
-  const { insights, isAnalyzing } = useAIEngine();
+  const { insights } = useAIEngine();
   const { tasks, addTask, completeTask, setTaskStatus, deleteTask } = useLocalData();
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -204,12 +204,6 @@ export function TaskPlannerPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {isAnalyzing && (
-          <div className="flex items-center gap-1.5 text-xs text-primary">
-            <Loader2 className="size-3 animate-spin" /> Re-analyzing workload…
-          </div>
-        )}
 
         {/* Search + Filter */}
         <div className="flex items-center gap-4 flex-wrap">
