@@ -12,7 +12,7 @@ export function isGeminiConfigured() {
 // task data so its answers are grounded instead of generic — this is the
 // seam the agentic layer (phase 3) plugs into.
 export async function askGemini({ message, history = [], systemContext = "" }) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const contents = [
