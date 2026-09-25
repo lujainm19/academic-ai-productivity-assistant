@@ -151,9 +151,6 @@ function AuthModal({
         <h3 className="text-lg font-medium text-white mb-1">
           {mode === "login" ? "Sign in" : "Create an account"}
         </h3>
-        <p className="text-xs text-white/45 mb-5">
-          This only exists so your Spotify and Calendar connections are yours. Nothing else in the app needs it.
-        </p>
         <form
           onSubmit={e => { e.preventDefault(); onSubmit(email, password); }}
           className="space-y-3"

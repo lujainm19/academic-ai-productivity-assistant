@@ -185,8 +185,15 @@ export function SettingsPage() {
                 <Row
                   icon={UserIcon}
                   title="not signed in"
-                  subtitle="connect an integration below to create an account"
-                  action={<span className="text-xs text-muted-foreground">·</span>}
+                  subtitle="tap to create an account or sign in"
+                  action={
+                    <button
+                      onClick={() => requireSignIn(() => {})}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                    >
+                      sign in
+                    </button>
+                  }
                 />
               )}
               <IntegrationRow

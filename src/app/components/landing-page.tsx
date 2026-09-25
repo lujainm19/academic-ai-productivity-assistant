@@ -22,6 +22,8 @@ import {
 import { useNavigate } from "react-router";
 import { useRef } from "react";
 import { ProdigyMark } from "./prodigy-mark";
+import { useAppAuth } from "./app-auth-context";
+
 
 const INK = "#1a1a1a";
 const CREAM = "#f8f1e2";
@@ -149,6 +151,7 @@ function FeatureSection({
 export function LandingPage() {
   const navigate = useNavigate();
   const parallax = useParallax(22);
+  const { requireSignIn } = useAppAuth();
 
   return (
     <div className="min-h-screen" style={{ background: CREAM, color: INK }}>
@@ -159,13 +162,22 @@ export function LandingPage() {
             <ProdigyMark size={26} />
             <span className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>prodigy</span>
           </div>
-          <button
-            onClick={() => navigate("/focus")}
-            className="px-5 py-2.5 rounded-full text-sm font-medium transition-transform hover:scale-105"
-            style={{ background: INK, color: CREAM }}
-          >
-            start focusing
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => requireSignIn(() => navigate("/tasks"))}
+              className="px-4 py-2 rounded-full text-sm font-medium transition-colors"
+              style={{ color: INK, border: `1px solid rgba(26,26,26,0.2)` }}
+            >
+              sign in
+            </button>
+            <button
+              onClick={() => navigate("/focus")}
+              className="px-5 py-2.5 rounded-full text-sm font-medium transition-transform hover:scale-105"
+              style={{ background: INK, color: CREAM }}
+            >
+              start focusing
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -253,13 +265,21 @@ export function LandingPage() {
               start focusing
               <ArrowRight className="size-4" />
             </button>
-            <a
-              href="#how-it-works"
+            <button
+              onClick={() => requireSignIn(() => navigate("/tasks"))}
               className="px-6 py-3.5 rounded-full font-medium border transition-colors hover:bg-black/[0.04]"
               style={{ borderColor: "rgba(26,26,26,0.18)" }}
             >
-              see how it works
-            </a>
+              sign in
+            </button>
+
+            <a  
+            href="#how-it-works"
+            className="px-6 py-3.5 rounded-full font-medium border transition-colors hover:bg-black/[0.04]"
+            style={{ borderColor: "rgba(26,26,26,0.18)" }}
+          >
+            see how it works
+          </a>
           </motion.div>
         </div>
 
