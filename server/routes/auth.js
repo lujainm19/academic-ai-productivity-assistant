@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import {
   hashPassword, verifyPassword, createUser, findUserByEmail,
   createSession, destroySession, setSessionCookie, clearSessionCookie,
@@ -57,4 +58,68 @@ authRouter.post("/logout", (req, res) => {
 // whether to show a sign-in prompt or the provider's own Connect button.
 authRouter.get("/me", attachUserIfPresent, (req, res) => {
   res.json({ user: req.user ? { email: req.user.email } : null });
+
+  // Google OAuth — Sign in with Google
+// Step 1: redirect the browser to Google's consent screen
+authRouter.get("/google", (req, res) => {
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: process.env.GOOGLE_AUTH_REDIRECT_URI,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "select_account",
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// Step 2: Google redirects back here with a code
+// We exchange it for tokens, get the user's email, create/find account
+authRouter.get("/google/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.redirect(`${process.env.FRONTEND_ORIGIN}?auth=error`);
+
+  try {
+    // Exchange code for tokens
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_AUTH_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    const tokens = await tokenRes.json();
+    if (!tokens.access_token) throw new Error("No access token");
+
+    // Get user's Google profile
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const profile = await profileRes.json();
+    if (!profile.email) throw new Error("No email from Google");
+
+    // Find or create user in our database
+    let user = findUserByEmail(profile.email);
+    if (!user) {
+      // Create account with a random password since they use Google to sign in
+      const randomPassword = await hashPassword(crypto.randomBytes(32).toString("hex"));
+      user = createUser(profile.email, randomPassword);
+    }
+
+    // Create session and set cookie
+    const token = createSession(user.id);
+    setSessionCookie(res, token);
+
+    // Redirect back to the app
+    res.redirect(`${process.env.FRONTEND_ORIGIN}/tasks`);
+  } catch (err) {
+    console.error("Google OAuth error:", err);
+    res.redirect(`${process.env.FRONTEND_ORIGIN}?auth=error`);
+  }
+});
 });
