@@ -9,7 +9,7 @@ const navItems = [
   { path: "/tasks", icon: Target, label: "Tasks" },
   { path: "/focus", icon: Zap, label: "Focus" },
   { path: "/ai", icon: Brain, label: "Prodigy - AI Assistant", highlight: true },
-  { path: "/settings", icon: Settings, label: "Settings" }
+    { path: "/settings", icon: Settings, label: "Settings & Profile" }
 ];
 
 export function AppLayout() {

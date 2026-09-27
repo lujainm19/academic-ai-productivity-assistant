@@ -155,7 +155,7 @@ export function SettingsPage() {
     <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-2xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pb-2">
-          <h1 className="text-3xl font-bold tracking-tight mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>settings</h1>
+          <h1 className="text-3xl font-bold tracking-tight mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Settings and Profile</h1>
           <p className="text-muted-foreground text-sm">everything that isn't your focus space. it lives on its own page.</p>
         </motion.div>
 
