@@ -119,19 +119,19 @@ function IntegrationRow({
 }
 
 export function SettingsPage() {
-  const { settings, setTheme } = useCustomization();
+  const { settings, applyNow } = useCustomization();
   const { tasks, stats, resetProgress } = useLocalData();
   const { widgets, background, resetCanvas } = useFocusCanvas();
   const { user, loading, logout, requireSignIn } = useAppAuth();
 
   const handleResetProgress = () => {
-    if (window.confirm("Reset all progress? This clears your level, XP, streak, unlocked badges, and every task. It's like starting a brand new account. This can't be undone.")) {
+      if (window.confirm("Reset all data? This clears every course, task, and material — it's like starting a brand new account. This can't be undone.")) {
       resetProgress();
     }
   };
 
   const handleResetCanvas = () => {
-    if (window.confirm("Clear your Focus canvas? This removes every widget you've placed and brings back the \"build your focus space\" setup screen. Your tasks and progress aren't affected.")) {
+      if (window.confirm("Clear your Focus canvas? This removes every widget you've placed and brings back the \"build your focus space\" setup screen. Your tasks and courses aren't affected.")) {
       resetCanvas();
     }
   };
@@ -230,7 +230,7 @@ export function SettingsPage() {
             {themes.map(theme => {
               const isSelected = settings.themeId === theme.id;
               return (
-                <button key={theme.id} onClick={() => setTheme(theme.id)} className="flex flex-col items-center gap-1.5">
+                  <button key={theme.id} onClick={() => applyNow({ themeId: theme.id })} className="flex flex-col items-center gap-1.5">
                   <div className={`size-9 rounded-full bg-gradient-to-br ${theme.swatch} flex items-center justify-center transition-transform ${isSelected ? "ring-2 ring-offset-2 ring-offset-background ring-foreground scale-110" : "hover:scale-105"}`}>
                     {isSelected && <Check className="size-3.5 text-white" />}
                   </div>
@@ -241,19 +241,25 @@ export function SettingsPage() {
           </div>
         </Section>
 
-        {/* ── Your data ──────────────────────────────────────────────── */}
-        <Section title="Your data" hint="everything lives on this device. nothing here is synced to a server unless you connect Spotify or Calendar above.">
+                {/* ── Export ─────────────────────────────────────────────────── */}
+        <Section title="Export" hint="everything lives on this device — take a copy anytime.">
           <div className="rounded-xl border border-border divide-y divide-border overflow-hidden py-1">
             <Row
-              icon={Download} title="Export your data" subtitle="download tasks, progress, and canvas as JSON"
+              icon={Download} title="Export your data" subtitle="download courses, tasks, and materials as JSON"
               action={<button onClick={handleExport} className="text-xs px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors">export</button>}
             />
+          </div>
+        </Section>
+
+        {/* ── Danger zone ────────────────────────────────────────────── */}
+        <Section title="Danger zone" hint="these can't be undone.">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 divide-y divide-destructive/20 overflow-hidden py-1">
             <Row
               icon={RotateCcw} title="Reset focus canvas" subtitle="clear widgets, start from the setup screen again"
               action={<button onClick={handleResetCanvas} className="text-xs px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors">reset</button>}
             />
             <Row
-              icon={Trash2} title="Reset all progress" subtitle="level, XP, streak, badges, tasks. all of it"
+              icon={Trash2} title="Reset all data" subtitle="courses, tasks, materials, history. all of it"
               action={<button onClick={handleResetProgress} className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">reset</button>}
             />
           </div>
